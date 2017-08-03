@@ -65,7 +65,7 @@ is_test_included() {
     [ $debug == "True" ] && write_debug "Including test $id "
     
     return 0
-}
+} ## Checks whether to run a particular test or not
 get_id() {
     echo $1 | sed -e 's/test_//' -e 's/\.x.*$//'
 } ## Returns a prettied id for a calling function
@@ -95,7 +95,7 @@ EOF
       $me --debug
       
     Exclude tests from section 1.1 and 1.3.2:
-      $me --exclude "1.1 1.32"
+      $me --exclude "1.1 1.3.2"
 
     Include tests only from section 4.1 but exclude tests from section 4.1.1:
       $me --include 4.1 --exclude 4.1.1

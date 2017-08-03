@@ -7,7 +7,7 @@ _Please note that only CentOS 7 is supported at this time._
 ### How do I use this script?
 Download:
 
-    curl -LO https://raw.github.com/finalduty/cis_benchmarks_audit/cis-audit.sh && chmod 750 cis-audit.sh
+    curl -LO https://raw.githubusercontent.com/finalduty/cis_benchmarks_audit/master/cis-audit.sh&& chmod 750 cis-audit.sh
 
 Run: 
 ```
