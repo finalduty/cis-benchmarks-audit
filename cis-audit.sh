@@ -1,5 +1,5 @@
 #!/bin/bash
-## andy.dustin@gmail.com [rev: a42d1a0]
+## andy.dustin@gmail.com [rev: a440c17]
 
 ## This script checks for compliance against CIS CentOS Linux 7 Benchmark v2.1.1 01-31-2017 measures
 ## Each individual standard has it's own function and is forked to the background, allowing for 
@@ -246,7 +246,12 @@ run_test() {
         
         [ $debug == "True" ] && write_debug "There were $(( $(pgrep -P $$ 2>&1 | wc -l) - 1 ))/$max_running_tests max_running_tasks when starting test $id."
         
-        $test $id $args &
+        ## Don't try to thread script if trace is enabled so it's output is tidier :)
+        if [ $trace == "True" ]; then
+            $test $id $args
+        else
+            $test $id $args &
+        fi
     fi
     
     return 0
@@ -381,12 +386,12 @@ test_perms() {
     file_g=$(echo $file_perms | cut -c4)
     file_o=$(echo $file_perms | cut -c5)
     
-    [ "$(ls -l $file | awk '{ print $3" "$4 }')" == "root root" ] || state=1
+    [ "$(ls -ld $file | awk '{ print $3" "$4 }')" == "root root" ] || state=1
     [ $file_u -le $u ] || state=1
     [ $file_g -le $g ] || state=1
     [ $file_o -le $o ] || state=1
     
-    [ $state -eq 0 ]&& result=Pass
+    [ $state -eq 0 ] && result=Pass
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -404,7 +409,7 @@ test_1.1.1.x() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        [ $(diff -qs <(modprobe -n -v $filesystem 2>/dev/null) <(echo "install /bin/true") &>/dev/null; echo $?) -ne 0 ] && state=$(( $state + 1 ))
+        [ $(diff -qsZ <(modprobe -n -v $filesystem 2>/dev/null | tail -1) <(echo "install /bin/true") &>/dev/null; echo $?) -ne 0 ] && state=$(( $state + 1 ))
         [ $(lsmod | grep $filesystem | wc -l) -ne 0 ] && state=$(( $state + 2 ))
         [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
@@ -606,7 +611,7 @@ test_1.5.1() {
         state=0
         str='ExecStart=-/bin/sh -c "/usr/sbin/sulogin; /usr/bin/systemctl --fail --no-block default"'
         
-        [ "$(grep "hard core" /etc/security/limits.conf /etc/security/limits.d/*)" == "* hard core 0" ] || state=1
+        [ "$(grep "hard core" /etc/security/limits.conf /etc/security/limits.d/* | sed 's/^.*://' )" == "* hard core 0" ] || state=1
         [ "$(sysctl fs.suid_dumpable)" == "fs.suid_dumpable = 0" ] || state=1
         [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
@@ -781,8 +786,8 @@ test_1.7.1.1() {
     ## Tests Start ##
         state=0
         
-        [ $(wc -l /etc/motd | awk '{print $1}') -gt 1 ] || state=1
-        [ $(egrep '(\\v|\\r|\\m|\\s)' /etc/motd | wc -l) -gt 0 ] || state=1
+        [ $(wc -l /etc/motd | awk '{print $1}') -gt 0 ] || state=1
+        [ $(egrep '(\\v|\\r|\\m|\\s)' /etc/motd | wc -l) -eq 0 ] || state=1
         [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
 
@@ -799,8 +804,8 @@ test_1.7.1.2() {
     ## Tests Start ##
         state=0
         
-        [ $(wc -l /etc/issue | awk '{print $1}') -gt 1 ] || state=1
-        [ $(egrep '(\\v|\\r|\\m|\\s)' /etc/issue | wc -l) -gt 0 ] || state=1
+        [ $(wc -l /etc/issue | awk '{print $1}') -gt 0 ] || state=1
+        [ $(egrep '(\\v|\\r|\\m|\\s)' /etc/issue | wc -l) -eq 0 ] || state=1
         [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
 
@@ -817,31 +822,11 @@ test_1.7.1.3() {
     ## Tests Start ##
         state=0
         
-        [ $(wc -l /etc/issue.net | awk '{print $1}') -gt 1 ] || state=1
-        [ $(egrep '(\\v|\\r|\\m|\\s)' /etc/issue.net | wc -l) -gt 0 ] || state=1
+        [ $(wc -l /etc/issue.net | awk '{print $1}') -gt 0 ] || state=1
+        [ $(egrep '(\\v|\\r|\\m|\\s)' /etc/issue.net | wc -l) -eq 0 ] || state=1
         [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
 
-    duration="$(test_finish $id $test_start_time)ms"
-    write_result "$id,$description,$scored,$level,$result,$duration"
-}
-test_1.7.1.4() {
-    id=$1
-    description="Ensure permissions on /etc/motd are configured"
-    level=1
-    scored="Not Scored"
-    test_start_time=$(test_start $id)
-    
-    ## Tests Start ##
-        state=0
-        str=$(ls -l /etc/motd)
-        
-        [ $(echo $str | awk '{print $1}') == "-rw-r--r--." ] || state=1
-        [ $(echo $str | awk '{print $3}') == "root" ] || state=1
-        [ $(echo $str | awk '{print $4}') == "root" ] || state=1
-        [ $state -eq 0 ] && result="Pass"
-    ## Tests End ##
-    
     duration="$(test_finish $id $test_start_time)ms"
     write_result "$id,$description,$scored,$level,$result,$duration"
 }
@@ -946,7 +931,11 @@ test_2.1.7() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        [ $(systemctl is-enabled xinetd) == "disabled" ] && result="Pass"
+    if [ "$(rpm -q xinetd)" != "package xinetd is not installed" ]; then
+        [ $(systemctl is-enabled xinetd) == "disabled" ] || state=1
+    fi
+    
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1065,12 +1054,12 @@ test_2.2.7() {
     
     ## Tests Start ##
     if [ $(rpm -q nfs-utils &>/dev/null; echo $?) -eq 0 ]; then
-        [ $(systemctl is-enabled nfs-server.service) == "disabled" ] && state=1
-        [ $(netstat -tupln | egrep ":2049 " | wc -l) -ne 0 ] && state=2
+        [ $(systemctl is-enabled nfs-server.service) == "disabled" ] || state=1
+        [ $(netstat -tupln | egrep ":2049 " | wc -l) -eq 0 ] || state=2
     fi
     if [ $(rpm -q rpcbind &>/dev/null; echo $?) -eq 0 ]; then
-        [ $(systemctl is-enabled rpcbind.socket) == "disabled" ] && state=4
-        [ $(netstat -tupln | egrep ":111 " | wc -l) -ne 0 ] && state=8
+        [ $(systemctl is-enabled rpcbind.socket) == "disabled" ] || state=4
+        [ $(netstat -tupln | egrep ":111 " | wc -l) -eq 0 ] || state=8
     fi
     
     [ $state -eq 0 ] && result=Pass
@@ -1129,7 +1118,7 @@ test_2.3.x() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        [ $(rpm -q $pkg &>/dev/null; echo $?) -eq 0 ] && result="Pass"
+        [ $(rpm -q $pkg &>/dev/null; echo $?) -eq 1 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1166,8 +1155,8 @@ test_3.x-double() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        [ "$(sysctl net.$protocol.conf.all.$sysctl)" == "net.$protocol.conf.all.sysctl = $val" ] && state=1
-        [ "$(sysctl net.$protocol.conf.default.$sysctl)" == "net.$protocol.conf.default.$sysctl = $val" ] && state=2
+        [ "$(sysctl net.$protocol.conf.all.$sysctl)" == "net.$protocol.conf.all.$sysctl = $val" ] || state=1
+        [ "$(sysctl net.$protocol.conf.default.$sysctl)" == "net.$protocol.conf.default.$sysctl = $val" ] || state=2
         [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
@@ -1230,7 +1219,7 @@ test_3.4.3() {
     
     ## Tests Start ##
         if [ -f /etc/hosts.deny ]; then
-            [ "$(cat /etc/hosts.deny)" == "ALL: ALL" ] && result="Pass"
+            [ "$(tail -1 /etc/hosts.deny)" == "ALL: ALL" ] && result="Pass"
         fi
     ## Tests End ##
     
@@ -1268,7 +1257,7 @@ test_3.5.x() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        [ $(diff -qs <(modprobe -n -v $protocl 2>/dev/null) <(echo "install /bin/true") &>/dev/null; echo $?) -ne 0 ] && state=1
+        [ $(diff -qsZ <(modprobe -n -v $protocol 2>/dev/null | tail -1) <(echo "install /bin/true") &>/dev/null; echo $?) -ne 0 ] && state=1
         [ $(lsmod | grep $protocol | wc -l) -ne 0 ] && state=2
         [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
@@ -1304,11 +1293,11 @@ test_3.6.3() {
     ## Tests Start ##
         str=$(iptables -S -w60)
         [ $(echo "$str" | grep -c -- "-A INPUT -i lo -j ACCEPT") != 0 ] || state=1
-        [ $(echo "$str" | grep -c -- "-A OUTPUT -i lo -j ACCEPT") != 0 ] || state=2
+        [ $(echo "$str" | grep -c -- "-A OUTPUT -o lo -j ACCEPT") != 0 ] || state=2
         
         ## This check differs slightly from that specified in the standard. 
         ## I personally believe it's safer to specify that the rule is not on the loopback interface
-        [ $(echo "$str" | grep -c -- "-A INPUT -s 127.0.0.0/8 ! -i lo -j DROP") != 0 ] || state=4
+        [ $(echo "$str" | egrep -c -- "-A INPUT -s 127\.0\.0\.0\/8 ?(?:\s! -i lo)? -j DROP") != 0 ] || state=4
         
         [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
@@ -1686,7 +1675,7 @@ test_4.2.1.3() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-    [ $(grep -c "^\$FileCreateMode 640" /etc/rsyslog.conf) -gt 0 ] && result="Pass"
+    [ $(egrep -c '^\$FileCreateMode\s.?640' /etc/rsyslog.conf) -gt 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1700,7 +1689,7 @@ test_4.2.1.4() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-    [ $(grep -c "^*.*[^I][^I]*@" /etc/rsyslog.conf) -gt 0 ] && result="Pass"
+    [ $(grep -c '^*.*[^I][^I]*@' /etc/rsyslog.conf) -gt 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1779,9 +1768,9 @@ test_5.1.8() {
     ## Tests Start ##
     [ -f /etc/at.deny ] && state=1
     [ -f /etc/cron.deny ] && state=1
-    if [ -f /etc/at.allow -a -f cron.allow ]; then
-        [ $(ls -l at.allow 2>/dev/null | awk '{ print $1" "$3" "$4 }' | grep -c "-rw-r--r--. root root") -eq 1 ] || state=1
-        [ $(ls -l cron.allow 2>/dev/null | awk '{ print $1" "$3" "$4 }' | grep -c "-rw-r--r--. root root") -eq 1 ] || state=1
+    if [ -f /etc/at.allow -a -f /etc/cron.allow ]; then
+        [ $(ls -l /etc/at.allow 2>/dev/null | awk '{ print $1" "$3" "$4 }' | grep -c -- "-rw-------. root root") -eq 1 ] || state=1
+        [ $(ls -l /etc/cron.allow 2>/dev/null | awk '{ print $1" "$3" "$4 }' | grep -c -- "-rw-------. root root") -eq 1 ] || state=1
     else
         state=1
     fi
@@ -1940,7 +1929,7 @@ test_5.2.12() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-    [ $(egrep -c "^MACs\shmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128- etm@openssh.com,hmac-sha2-512,hmac-sha2-256,umac-128@openssh.com$" /etc/ssh/sshd_config) -eq 1 ] && result="Pass"
+    [ $(egrep -c "^MACs\shmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,umac-128@openssh.com$" /etc/ssh/sshd_config) -eq 1 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1974,7 +1963,7 @@ test_5.2.14() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-    if [ $(grep -c "^LoginGraceTime" /etc/ssh/sshd_config) -eq 2 ]; then
+    if [ $(grep -c "^LoginGraceTime" /etc/ssh/sshd_config) -eq 1 ]; then
         [ $(grep "^LoginGraceTime" /etc/ssh/sshd_config | awk '{print $2}') -le 60 ] && result="Pass"
     else
         state=1
@@ -2012,15 +2001,15 @@ test_5.3.1() {
     [ $(grep -c "^password requisite pam_pwquality.so try_first_pass retry=3" /etc/pam.d/password-auth) -eq 1 ] || state=1
     [ $(grep -c "^password requisite pam_pwquality.so try_first_pass retry=3" /etc/pam.d/system-auth) -eq 1 ] || state=1
     
-    if [ $(grep -c "^minlen=" $file) -eq 1 ]; then
-        [ $(grep "^minlen=" $file | sed 's/^.*=-//' ) -ge 14 ] || state=1
+    if [ "$(grep -c "^minlen=" $file)" -eq 1 ]; then
+        [ "$(grep "^minlen=" $file | sed 's/^.*=//' )" -ge 14 ] || state=1
     else
         state=1
     fi
     
     for i in dcredit ucredit ocredit lcredit; do
-        if [ $(grep -c "^$i=" $file) -eq 1 ]; then
-            [ $(grep "^$i=" $file | sed 's/^.*=-//' ) -ge 1 ] || state=1
+        if [ "$(grep -c "^$i=" $file)" -eq 1 ]; then
+            [ "$(grep "^$i=" $file | sed 's/^.*=-//' )" -ge 1 ] || state=1
         else
             state=1
         fi
@@ -2042,8 +2031,8 @@ test_5.3.3() {
     
     ## Tests Start ##
     for file in /etc/pam.d/password-auth /etc/pam.d/system-auth; do
-        if [ $(egrep -c "^pasword\s+sufficient\s+pam_unix.so" $file) -eq 1 ]; then
-            [ $(egrep -c "^pasword\s+sufficient\s+pam_unix.so" $file | sed 's/^.*=//' ) -ge 5 ] || state=1
+        if [ $(egrep -c "^password\s+sufficient\s+pam_unix.so" $file) -eq 1 ]; then
+            [ $(egrep "^password\s+sufficient\s+pam_unix.so" $file | sed -e 's/^.*remember=//' -e's/\s.*$//' ) -ge 5 ] || state=1
         else
             state=1
         fi
@@ -2063,8 +2052,8 @@ test_5.3.4() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-    [ $(egrep -c "^pasword\s+sufficient\s+pam_unix.so sha-512" /etc/pam.d/system-auth) -eq 1 ] || state=1
-    [ $(egrep -c "^pasword\s+sufficient\s+pam_unix.so sha-512" /etc/pam.d/password-auth) -eq 1 ] || state=1
+    [ $(egrep -c "^password\s+sufficient\s+pam_unix.so.*sha512" /etc/pam.d/system-auth) -eq 1 ] || state=1
+    [ $(egrep -c "^password\s+sufficient\s+pam_unix.so.*sha512" /etc/pam.d/password-auth) -eq 1 ] || state=1
     
     [ $state -eq 0 ]&& result="Pass"
     ## Tests End ##
@@ -2209,7 +2198,7 @@ test_5.4.3() {
 }
 test_5.4.4() {
     id=$1
-    description="Ensure default group for the root account is GID 0"
+    description="Ensure default user umask is 027 or more restrictive"
     level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
@@ -2350,7 +2339,7 @@ test_6.2.5() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-    [ $(awk -F: '$3 == 0' /etc/passwd | wc -l) -eq 0 ] || state=1
+    [ $(awk -F: '$3 == 0' /etc/passwd | wc -l) -eq 1 ] || state=1
     
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
@@ -2366,18 +2355,20 @@ test_6.2.6() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-    [ $(echo $PATH | grep -c '::') -eq 0 ] && state=1
-    [ $(echo $PATH | grep -c ':$') -eq 0 ] && state=1
+    [ $(echo $PATH | grep -c '::') -eq 0 ] || state=$(( $state + 1 ))
+    [ $(echo $PATH | grep -c ':$') -eq 0 ] || state=$(( $state + 2 ))
     
     if [ $state -eq 0 ]; then
         for p in $(echo $PATH | sed -e 's/::/:/' -e 's/:$//' -e 's/:/ /g'); do 
-            if [ -d $p -a $p != "." ]; then
-                perms=$(ls -hal $p)
-                [ "$(echo $perms | cut -c6)" == '-' ] || state=1
-                [ "$(echo $perms | cut -c9)" == '-' ] || state=1
-                [ "$(echo $perms | awk '{print $3}')" == "root" ] || state=1
-            else
-                state=1
+            if [ -d $p ]; then
+                if [ "$p" != "." ]; then
+                    perms=$(ls -hald "$p/")
+                    [ "$(echo $perms | cut -c6)" == '-' ] || state=$(( $state + 4 ))
+                    [ "$(echo $perms | cut -c9)" == '-' ] || state=$(( $state + 8 ))
+                    [ "$(echo $perms | awk '{print $3}')" == "root" ] || state=$(( $state + 16 ))
+                else
+                    state=$(( $state + 32 ))
+                fi
             fi
         done
     fi
@@ -2744,7 +2735,7 @@ if [ $(is_test_included 1; echo $?) -eq 0 ]; then   write_cache "1,Initial Setup
             run_test 1.7.1.1 test_1.7.1.1   ## 1.7.1.1 Ensure message of the day is configured properly (Scored)
             run_test 1.7.1.2 test_1.7.1.2   ## 1.7.1.2 Ensure local login warning banner is configured properly (Not Scored)
             run_test 1.7.1.3 test_1.7.1.3   ## 1.7.1.3 Ensure remote login warning banner is configured properly (Not Scored)
-            run_test 1.7.1.4 test_1.7.1.4   ## 1.7.1.4 Ensure permissions on /etc/motd are configured (Not Scored)
+            run_test 1.7.1.4 test_perms 644 /etc/motd   ## 1.7.1.4 Ensure permissions on /etc/motd are configured (Not Scored)
             run_test 1.7.1.5 test_perms 644 /etc/issue   ## 1.7.1.5 Ensure permissions on /etc/issue are configured (Scored)
             run_test 1.7.1.6 test_perms 644 /etc/issue.net   ## 1.7.1.6 Ensure permissions on /etc/issue.net are configured (Not Scored)
         fi
@@ -2752,7 +2743,7 @@ if [ $(is_test_included 1; echo $?) -eq 0 ]; then   write_cache "1,Initial Setup
     fi
     
     run_test 1.8 test_1.8   ## 1.8 Ensure updates, patches, and additional security software are installed (Not Scored) 
-fi 
+fi
 
 ## Section 2 - Services
 if [ $(is_test_included 2; echo $?) -eq 0 ]; then   write_cache "2,Services"
@@ -2908,18 +2899,19 @@ if [ $(is_test_included 5; echo $?) -eq 0 ]; then   write_cache "5,Access Authen
     if [ $(is_test_included 5.1; echo $?) -eq 0 ]; then   write_cache "5.1,Configure cron"
         run_test 5.1.1 test_is_enabled crond "cron daemon"   ## 5.1.1 Ensure cron daemon is enabled (Scored)
         run_test 5.1.2 test_perms 600 /etc/crontab   ## 5.1.2 Ensure permissions on /etc/crontab are configured (Scored)
-        run_test 5.1.3 test_perms 600 /etc/cron.hourly   ## 5.1.2 Ensure permissions on /etc/cron.hourly are configured (Scored)
-        run_test 5.1.4 test_perms 600 /etc/cron.daily   ## 5.1.2 Ensure permissions on /etc/cron.daily are configured (Scored)
-        run_test 5.1.5 test_perms 600 /etc/cron.weekly   ## 5.1.2 Ensure permissions on /etc/cron.weekly are configured (Scored)
-        run_test 5.1.6 test_perms 600 /etc/cron.monthly   ## 5.1.2 Ensure permissions on /etc/cron.monthly are configured (Scored)
-        run_test 5.1.7 test_perms 600 /etc/cron.d   ## 5.1.2 Ensure permissions on /etc/cron.d are configured (Scored)
+        run_test 5.1.3 test_perms 700 /etc/cron.hourly   ## 5.1.2 Ensure permissions on /etc/cron.hourly are configured (Scored)
+        run_test 5.1.4 test_perms 700 /etc/cron.daily   ## 5.1.2 Ensure permissions on /etc/cron.daily are configured (Scored)
+        run_test 5.1.5 test_perms 700 /etc/cron.weekly   ## 5.1.2 Ensure permissions on /etc/cron.weekly are configured (Scored)
+        run_test 5.1.6 test_perms 700 /etc/cron.monthly   ## 5.1.2 Ensure permissions on /etc/cron.monthly are configured (Scored)
+        run_test 5.1.7 test_perms 700 /etc/cron.d   ## 5.1.2 Ensure permissions on /etc/cron.d are configured (Scored)
         run_test 5.1.8 test_5.1.8   ## Ensure at/cron is restri9cted to authorized users (Scored)
     fi
     if [ $(is_test_included 5.2; echo $?) -eq 0 ]; then   write_cache "5.2,SSH Server Configuration"
-        run_test 5.2.2 test_perms 600 /etc/ssh/sshd_config   ## 5.6.2 Ensure permissions on /etc/ssh/sshd_config are configured (Scored)
-        run_test 5.2.3 test_5.2.3   ## Ensure SSH Protocol is set to 2 (Scored)
-        run_test 5.2.4 test_5.2.4   ## Ensure SSH LogLevel is set to INFO (Scored)
-        run_test 5.2.5 test_5.2.5   ## Ensure SSH X11 forwarding is disabled (Scored)
+        run_test 5.2.1 test_perms 600 /etc/ssh/sshd_config   ## 5.2.1 Ensure permissions on /etc/ssh/sshd_config are configured (Scored)
+        run_test 5.2.2 test_5.2.2   ## 5.2.2 Ensure SSH Protocol is set to 2 (Scored)
+        run_test 5.2.3 test_5.2.3   ## 5.2.3 Ensure SSH LogLevel is set to INFO (Scored)
+        run_test 5.2.4 test_5.2.4   ## 5.2.4 Ensure SSH X11 forwarding is disabled (Scored)
+        run_test 5.2.5 test_5.2.5   ## 5.2.5 Ensure MaxAuthTries is set to 4 or less (Scored)
         run_test 5.2.6 test_5.2.6   ## 5.2.6 Ensure SSH IgnoreRhosts is enabled (Scored)
         run_test 5.2.7 test_5.2.7   ## 5.2.7 Ensure SSH HostbasedAUthentication is disabled (Scored)
         run_test 5.2.8 test_5.2.8   ## 5.2.8 Ensure root login is disabled (Scored)
