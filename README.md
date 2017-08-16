@@ -7,7 +7,7 @@ _Please note that only CentOS 7 is supported at this time._
 ### How do I use this script?
 Download:
 
-    curl -LO https://raw.githubusercontent.com/finalduty/cis_benchmarks_audit/master/cis-audit.sh&& chmod 750 cis-audit.sh
+    curl -LO https://raw.githubusercontent.com/finalduty/cis_benchmarks_audit/master/cis-audit.sh && chmod 750 cis-audit.sh
 
 Run: 
 ```
@@ -44,7 +44,8 @@ No changes are made to system files by this script.
 ```
 
 #### Disclaimer:
-This is not a replacement for a full audit and a passing result from this script does not necessarily mean that you are compliant (but should give a good idea of where to start). The script will never make any changes to your system for you, but will write temporary state output to /tmp (which it will clean up afterwards).
-This script can spawn multiple tests at a time making it possible that some tests could cause adverse effects to your server. There is an adjustable limit as well as a nicing argument which can help with this. In any case It is recommended that you **do not run this on a production server**.
+This is not a replacement for a full audit and a passing result from this script does not necessarily mean that you are compliant (but should give a good idea of where to start). The script will never make any changes to your system for you, but will write temporary state output to /tmp (which are cleaned up afterwards).
+This script can spawn multiple tests at a time and it possible that some tests could cause adverse effects on your system. There is an adjustable limit for processes as well as a nicing argument which can help keep load down.
+It is recommended that you **do not run this on a production server** at this time.
 
 _No warranty is offered and no responsibility will be taken for damage to systems resulting from the use of this script._

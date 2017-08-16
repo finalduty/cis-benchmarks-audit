@@ -1,5 +1,5 @@
 #!/bin/bash
-## andy.dustin@gmail.com [rev: a44ce5f]
+## andy.dustin@gmail.com [rev: a44ceb7]
 
 ## This script checks for compliance against CIS CentOS Linux 7 Benchmark v2.1.1 01-31-2017 measures
 ## Each individual standard has it's own function and is forked to the background, allowing for 
@@ -18,6 +18,7 @@
 ## See the License for the specific language governing permissions and limitations under the License.
 ##
 
+
 ### Variables ###
 ## This section defines global variables used in the script
 args=$@
@@ -35,7 +36,7 @@ progress_update_delay="0.1"
 max_running_tests=10
 debug=False
 trace=False
-renice_bool=False
+renice_bool=True
 renice_value=5
 start_time=$(date +%s)
 color=True
@@ -49,7 +50,7 @@ is_test_included() {
     level=$2
     state=0
     
-    [ $debug == "True" ] && write_debug "Checking whether to run test $id"
+    write_debug "Checking whether to run test $id"
     
     [ -z $level ] && level=$test_level
     
@@ -74,7 +75,7 @@ is_test_included() {
         elif [ $(for i in $include; do echo " $id" | grep " $i\."; done | wc -l) -gt 0 ]; then
             write_debug "Test $id is the child of an included test"
             state=0
-        elif [ $test_level == 3 ]; then
+        elif [ $test_level == 0 ]; then
             write_debug "Excluding test $id (Not found in the include list)"
             state=1
         fi
@@ -110,7 +111,8 @@ EOF
 |||--level (1,2)|Run tests for the specified level only
 |||--include "<test_ids>"|Space delimited list of tests to include
 |||--exclude "<test_ids>"|Space delimited list of tests to exclude
-|||--nice|Lowers the CPU priority of executing tests
+|||--nice [default]|Lowers the CPU priority of executing tests
+|||--no-nice|Do not lower CPU priority of executing tests. Setting this option overrides the --nice option
 |||--no-colour|Disable colouring for STDOUT (Note that output redirected to a file/pipe is never coloured)
 
 EOF
@@ -143,30 +145,29 @@ now() {
     echo $(( $(date +%s%N) / 1000000 ))
 } ## Short function to give standardised time for right now (saves updating the date method everywhere)
 outputter() {
-    [ $debug == "True" ] && write_debug "Formatting and writing results to STDOUT"
+    write_debug "Formatting and writing results to STDOUT"
     echo
     echo " CIS CentOS 7 Benchmark v2.1.1 Results "
     echo "---------------------------------------"
-
+    
     if [ -t 1 -a $color == "True" ]; then
         (
-        echo "ID,Description,Scoring,Level,Result,Duration"
-        echo "--,-----------,-------,-----,------,--------"
-        sort -V $tmp_file
+            echo "ID,Description,Scoring,Level,Result,Duration"
+            echo "--,-----------,-------,-----,------,--------"
+            sort -V $tmp_file
         ) | column -t -s , |\
             sed -e $'s/^[0-9]\s.*$/\\n\e[1m&\e[22m/' \
                 -e $'s/^[0-9]\.[0-9]\s.*$/\e[1m&\e[22m/' \
                 -e $'s/\sFail\s/\e[31m&\e[39m/' \
                 -e $'s/\sPass\s/\e[32m&\e[39m/' \
                 -e $'s/^.*\sSkipped\s.*$/\e[2m&\e[22m/'
-            
     else
         (
-        echo "ID,Description,Scoring,Level,Result,Duration"
-        sort -V $tmp_file
+            echo "ID,Description,Scoring,Level,Result,Duration"
+            sort -V $tmp_file
         ) | column -t -s , | sed -e '/^[0-9]\ / s/^/\n/'
     fi
-
+    
     tests_total=$(egrep -c "Scored|Skipped" $tmp_file)
     tests_skipped=$(grep -c ",Skipped," $tmp_file)
     tests_ran=$(( $tests_total - $tests_skipped ))
@@ -176,12 +177,8 @@ outputter() {
     echo
     echo "Passed $tests_passed of $tests_ran tests ($tests_skipped Skipped)"
     echo
-
-#    cat << EOF | column -t -s , | sed '/^[0-9]\ / s/^/\n/'
-#ID,Description,Scoring,Level,Result,Duration
-#$(sort -V $tmp_file)
-#EOF
-    [ $debug == "True" ] && write_debug "All results written to STDOUT"
+    
+    write_debug "All results written to STDOUT"
 } ## Prettily prints the results to the terminal
 parse_args() {
     args=$@
@@ -191,15 +188,16 @@ parse_args() {
     
     ## Check arguments for --debug
     $(echo $args | grep -- '--debug' &>/dev/null)  &&   debug="True" || debug="False"
-    [ $debug == "True" ] && write_debug "Debug enabled"
+    write_debug "Debug enabled"
     
     ## Full noise output
     $(echo $args | grep -- '--trace' &>/dev/null) &&  trace="True" && set -x
     [ $trace == "True" ] && write_debug "Trace enabled"
     
     ## Renice / lower priority of script execution
-    $(echo $args | grep -- '--nice' &>/dev/null)  &&   renice_bool="True" || renice_bool="False"
-    [ $renice_bool == "True" ] && write_debug "Tests will run with reduced execution priority"
+    $(echo $args | grep -- '--nice' &>/dev/null)  &&   renice_bool="True"
+    $(echo $args | grep -- '--no-nice' &>/dev/null)  &&   renice_bool="False"
+    [ $renice_bool == "True" ] && write_debug "Tests will run with reduced CPU priority"
     
     ## Disable colourised output
     $(echo $args | egrep -- '--no-color|--no-colour' &>/dev/null)  &&   color="False" || color="True"
@@ -209,27 +207,27 @@ parse_args() {
     ## NB: The whitespace at the beginning and end is required for the greps later on
     exclude=" $(echo "$args" | sed -e 's/^.*--exclude //' -e 's/--.*$//') "
     if [ $(echo "$exclude" | wc -c ) -gt 3 ]; then
-        [ $debug == "True" ] && write_debug "Exclude list is populated \"$exclude\""
+        write_debug "Exclude list is populated \"$exclude\""
     else
-        [ $debug == "True" ] && write_debug "Exclude list is empty"
+        write_debug "Exclude list is empty"
     fi
     
     ## Check arguments for --include
     ## NB: The whitespace at the beginning and end is required for the greps later on
     include=" $(echo "$args" | sed -e 's/^.*--include //' -e 's/--.*$//') "
     if [ $(echo "$include" | wc -c ) -gt 3 ]; then
-        [ $debug == "True" ] && write_debug "Include list is populated \"$include\""
+        write_debug "Include list is populated \"$include\""
     else
-        [ $debug == "True" ] && write_debug "Include list is empty"
+        write_debug "Include list is empty"
     fi
     
     ## Check arguments for --level
-    if [ $(echo $args | grep -- '--level 1' &>/dev/null; echo $?) -eq 0 ]; then
-        test_level=$(( $test_level + 1 ))
-        write_debug "Going to run Level 1 tests"
-    elif [ $(echo $args | grep -- '--level 2' &>/dev/null; echo $?) -eq 0 ]; then
+    if [ $(echo $args | grep -- '--level 2' &>/dev/null; echo $?) -eq 0 ]; then
         test_level=$(( $test_level + 2 ))
         write_debug "Going to run Level 2 tests"
+    elif [ $(echo $args | grep -- '--level 1' &>/dev/null; echo $?) -eq 0 ]; then
+        test_level=$(( $test_level + 1 ))
+        write_debug "Going to run Level 1 tests"
     else
         test_level=0
         write_debug "Going to run tests from any level"
@@ -239,7 +237,7 @@ parse_args() {
 } ## Parse arguments passed in to the script
 progress() {
     ## We don't want progress output while we're spewing debug or trace output
-    [ $debug == "True" ] && write_debug "Not displaying progress ticker while debug is enabled" && return 0
+    write_debug "Not displaying progress ticker while debug is enabled" && return 0
     [ $trace == "True" ] && return 0
     
     array=(\| \/ \- \\)
@@ -272,14 +270,14 @@ run_test() {
     args=$(echo $@ | awk '{$1 = $2 = $3 = ""; print $0}' | sed 's/^ *//')
     
     if [ $(is_test_included $id $level; echo $?) -eq 0 ]; then
-        [ $debug == "True" ] && write_debug "Requesting test $id by calling \"$test $id $args &\""
+        write_debug "Requesting test $id by calling \"$test $id $args &\""
         
         while [ "$(pgrep -P $$ 2>/dev/null | wc -l)" -ge $max_running_tests ]; do 
-            [ $debug == "True" ] && write_debug "There were already max_running_tasks ($max_running_tests) while attempting to start test $id. Pausing for $wait_time seconds"
+            write_debug "There were already max_running_tasks ($max_running_tests) while attempting to start test $id. Pausing for $wait_time seconds"
             sleep $wait_time
         done
         
-        [ $debug == "True" ] && write_debug "There were $(( $(pgrep -P $$ 2>&1 | wc -l) - 1 ))/$max_running_tests max_running_tasks when starting test $id."
+        write_debug "There were $(( $(pgrep -P $$ 2>&1 | wc -l) - 1 ))/$max_running_tests max_running_tasks when starting test $id."
         
         ## Don't try to thread script if trace is enabled so it's output is tidier :)
         if [ $trace == "True" ]; then
@@ -299,15 +297,15 @@ running_children() {
     ps --ppid $$ | egrep -v "$search_terms" | wc -l
 } ## Ghetto implementation that returns how many child processes are running
 setup() {
-    [ $debug == "True" ] && write_debug "Script was started with PID: $$"
+    write_debug "Script was started with PID: $$"
     if [ $renice_bool = "True" ]; then
         if [ $renice_value -gt 0 -a $renice_value -le 19 ]; then
             renice_output="$(renice +$renice_value $$)"
-            [ $debug == "True" ] && write_debug "Renicing $renice_output"
+            write_debug "Renicing $renice_output"
         fi
     fi
     
-    [ $debug == "True" ] && write_debug "Creating tmp files with base $tmp_file_base*"
+    write_debug "Creating tmp files with base $tmp_file_base*"
     cat /dev/null > $tmp_file
     cat /dev/null > $started_counter
     cat /dev/null > $finished_counter
@@ -316,24 +314,20 @@ test_start() {
     id=$1
     level=$2
     
-    [ $debug == "True" ] && write_debug "Test $id started"
-        
+    write_debug "Test $id started"
     echo "." >> $started_counter
-    [ $debug == "True" ] && write_debug "Progress: $( wc -l $finished_counter | awk '{print $1}' )/$( wc -l $started_counter | awk '{print $1}' ) tests."
+    write_debug "Progress: $( wc -l $finished_counter | awk '{print $1}' )/$( wc -l $started_counter | awk '{print $1}' ) tests."
     
     now
 } ## Prints debug output (when enabled) and returns current time
 test_finish() {
     id=$1
     start_time=$2
-    
     duration="$(( $(now) - $start_time ))"
-    [ $debug == "True" ] && write_debug "Test "$id" completed after "$duration"ms"
     
+    write_debug "Test "$id" completed after "$duration"ms"
     echo "." >> $finished_counter
-    [ $debug == "True" ] && write_debug "Progress: $( wc -l $finished_counter | awk '{print $1}' )/$( wc -l $started_counter | awk '{print $1}' ) tests."
-    
-    #progress_bar
+    write_debug "Progress: $( wc -l $finished_counter | awk '{print $1}' )/$( wc -l $started_counter | awk '{print $1}' ) tests."
     
     echo $duration
 } ## Prints debug output (when enabled) and returns duration since $start_time
@@ -342,7 +336,7 @@ tidy_up() {
     rm $opt "$tmp_file_base"* &>2
 } ## Tidys up files created during testing
 write_cache() {
-    [ $debug == "True" ] && write_debug "Writing to $tmp_file - $@"
+    write_debug "Writing to $tmp_file - $@"
     printf "$@\n" >> $tmp_file
 } ## Writes additional rows to the output cache
 write_debug() {
@@ -352,7 +346,7 @@ write_err() {
     printf "[ERROR] $@\n" >&2
 } ## Writes error output to STDERR
 write_result() {
-    [ $debug == "True" ] && write_debug "Writing result to $tmp_file - $@"
+    write_debug "Writing result to $tmp_file - $@"
     echo $@ >> $tmp_file
 } ## Writes test results to the output cache
 
@@ -2269,7 +2263,6 @@ test_5.6() {
 
 
 ## Section 6 - System Maintenance
-
 test_6.1.1() {
     id=$1
     level=$2
@@ -2868,7 +2861,7 @@ if [ $(is_test_included 3; echo $?) -eq 0 ]; then   write_cache "3,Network Confi
         run_test 3.6.2 1 test_3.6.2   ## 3.6.2 Ensure default deny firewall policy (Scored)
         run_test 3.6.3 1 test_3.6.3   ## 3.6.3 Ensure loopback traffic is configured (Scored)
         run_test 3.6.4 1 test_3.6.4   ## 3.6.4 Ensure outbound and established connections are configured (Not Scored)
-        run_test 3.6.5 1 skip_test "Ensure firewall rules exist for all open ports"   ## 3.6.5 Ensure firewall rules exist for all open ports (Scored)
+        run_test 3.6.5 skip_test "Ensure firewall rules exist for all open ports"   ## 3.6.5 Ensure firewall rules exist for all open ports (Scored)
     fi
     ## This test deviates from the benchmark's audit steps. The assumption here is that if you are on a server
     ## then you shouldn't have the wireless-tools installed for you to even use wireless interfaces
@@ -2893,7 +2886,7 @@ if [ $(is_test_included 4; echo $?) -eq 0 ]; then   write_cache "4,Logging and A
         run_test 4.1.9 2 test_4.1.9   ## 4.1.9 Ensure session initiation information is collected (Scored)
         run_test 4.1.10 2 test_4.1.10   ## 4.1.10 Ensure discretionary access control permission modification events are collected (Scored)
         run_test 4.1.11 2 test_4.1.11   ## 4.1.11 Ensure unsuccessful unauthorized file access attempts are collected (Scored)
-        run_test 4.1.12 1 skip_test "Ensure use of privileged commands is collected"   ## 4.1.12 Ensure use of privileged commands is collected (Scored)
+        run_test 4.1.12 skip_test "Ensure use of privileged commands is collected"   ## 4.1.12 Ensure use of privileged commands is collected (Scored)
         run_test 4.1.13 2 test_4.1.13   ## 4.1.13 Ensure successful file system mounts are collected (Scored)
         run_test 4.1.14 2 test_4.1.14   ## 4.1.14 Ensure file deletion events by users are collected (Scored)
         run_test 4.1.15 2 test_4.1.15   ## 4.1.15 Ensure changes to system administration scope (sudoers) is collected (Scored)
@@ -2906,10 +2899,10 @@ if [ $(is_test_included 4; echo $?) -eq 0 ]; then   write_cache "4,Logging and A
         if [ $(is_test_included 4.2.1; echo $?) -eq 0 ]; then
             if [ $(rpm -q rsyslog &>/dev/null; echo $?) -eq 0 ]; then   write_cache "4.2.1,Configure rsyslog"
                 run_test 4.2.1.1 1 test_is_enabled rsyslog.service rsyslog   ## 4.2.1.1 Ensure rsyslog service is enabled (Scored)
-                run_test 4.2.1.2 1 skip_test "Ensure logging is configured"   ## 4.2.1.2 Ensure logging is configured (Scored)
+                run_test 4.2.1.2 skip_test "Ensure logging is configured"   ## 4.2.1.2 Ensure logging is configured (Scored)
                 run_test 4.2.1.3 1 test_4.2.1.3   ## 4.2.1.3 Ensure rsyslog default file permissions configured (Scored)
                 run_test 4.2.1.4 1 test_4.2.1.4   ## 4.2.1.4 Ensure rsyslog is configured to send logs to a remote log host (Scored)
-                run_test 4.2.1.5 1 skip_test "Ensure remote rsyslog messages are only accepted on designated log hosts"   ## 4.2.1.5 Ensure remote rsyslog messages are only accepted on designated log hosts (Not Scored)
+                run_test 4.2.1.5 skip_test "Ensure remote rsyslog messages are only accepted on designated log hosts"   ## 4.2.1.5 Ensure remote rsyslog messages are only accepted on designated log hosts (Not Scored)
             else
                 write_cache "4.2.1,Configure rsyslog,Skipped"
             fi
@@ -2917,10 +2910,10 @@ if [ $(is_test_included 4; echo $?) -eq 0 ]; then   write_cache "4,Logging and A
         if [ $(is_test_included 4.2.2; echo $?) -eq 0 ]; then
             if [ $(rpm -q syslog-ng &>/dev/null; echo $?) -eq 0 ]; then   write_cache "4.2.2,Configure syslog-ng"
                 run_test 4.2.1.1 1 test_is_enabled syslog-ng.service syslog-ng   ## 4.2.2.1 Ensure syslog-ng service is enabled (Scored)
-                run_test 4.2.2.2 1 skip_test "Ensure logging is configured"   ## 4.2.2.2 Ensure logging is configured (Scored)
+                run_test 4.2.2.2 skip_test "Ensure logging is configured"   ## 4.2.2.2 Ensure logging is configured (Scored)
                 run_test 4.2.2.3 1 test_4.2.2.3   ## 4.2.1.3 Ensure syslog-ng default file permissions configured (Scored)
                 run_test 4.2.2.4 1 test_4.2.2.4   ## 4.2.2.4 Ensure syslog-ng is configured to send logs to a remote log host (Scored)
-                run_test 4.2.2.5 1 skip_test "Ensure remote syslog-ng messages are only accepted on designated log hosts"   ## 4.2.1.5 Ensure remote rsyslog messages are only accepted on designated log hosts (Not Scored)
+                run_test 4.2.2.5 skip_test "Ensure remote syslog-ng messages are only accepted on designated log hosts"   ## 4.2.1.5 Ensure remote rsyslog messages are only accepted on designated log hosts (Not Scored)
             else
                 write_cache "4.2.2,Configure syslog-ng,Skipped"
             fi
@@ -2928,7 +2921,7 @@ if [ $(is_test_included 4; echo $?) -eq 0 ]; then   write_cache "4,Logging and A
         run_test 4.2.3 1 test_4.2.3   ## 4.2.3 Ensure rsyslog or syslog-ng is installed (Scored)
         run_test 4.2.4 1 test_4.2.4   ## 4.2.4 Ensure permissions on all logfiles are configured (Scored)
     fi
-    run_test 4.3 1 skip_test "Ensure logrotate is configured"   ## 4.3 Ensure logrotate is configured (Not Scored)
+    run_test 4.3 skip_test "Ensure logrotate is configured"   ## 4.3 Ensure logrotate is configured (Not Scored)
 fi
 
 ## Section 5 - Access, Authentication and Authorization
@@ -2958,12 +2951,12 @@ if [ $(is_test_included 5; echo $?) -eq 0 ]; then   write_cache "5,Access Authen
         run_test 5.2.12 1 test_5.2.12   ## 5.2.12 Ensure only approved MAC algorithms are used (Scored)
         run_test 5.2.13 1 test_5.2.13   ## 5.2.13 Ensure SSH Idle Timeout Interval is configured (Scored)
         run_test 5.2.14 1 test_5.2.14   ## 5.2.14 Ensure SSH LoginGraceTime is set to one minute or less (Scored)
-        run_test 5.2.15 1 skip_test "Ensure SSH access is limited"   ## 5.2.15 Ensure (Scored)
+        run_test 5.2.15 skip_test "Ensure SSH access is limited"   ## 5.2.15 Ensure (Scored)
         run_test 5.2.16 1 test_5.2.16   ## 5.2.16 Ensure SSH warning banner is configured (Scored)
     fi
     if [ $(is_test_included 5.3; echo $?) -eq 0 ]; then   write_cache "5.3,Configure PAM"
         run_test 5.3.1 1 test_5.3.1   ## 5.3.1 Ensure password creation requirements are configured (Scored)
-        run_test 5.3.2 1 skip_test "Ensure lockout for failed password attempts is configured"   ## 5.3.2 Ensure lockout for failed password attempts is configured (Scored)
+        run_test 5.3.2 skip_test "Ensure lockout for failed password attempts is configured"   ## 5.3.2 Ensure lockout for failed password attempts is configured (Scored)
         run_test 5.3.3 1 test_5.3.3   ## 5.3.3 Ensure password reuse is limited (Scored)
         run_test 5.3.4 1 test_5.3.4   ## 5.3.4 Ensure password hashing algorithm is SHA-512 (Scored)
     fi
@@ -2978,7 +2971,7 @@ if [ $(is_test_included 5; echo $?) -eq 0 ]; then   write_cache "5,Access Authen
         run_test 5.4.3 1 test_5.4.3   ## 5.4.2 Ensure default group for the root account is GID 0 (Scored)
         run_test 5.4.4 1 test_5.4.4   ## 5.4.3 Ensure default user umask is 027 or more restrictive (Scored)
     fi
-    run_test 5.5 1 skip_test "Ensure root login is restricted to system console"   ## 5.5 Ensure root login is restricted to system console (Not Scored)
+    run_test 5.5 skip_test "Ensure root login is restricted to system console"   ## 5.5 Ensure root login is restricted to system console (Not Scored)
     run_test 5.6 1 test_5.6   ## 5.6 Ensure access to the su command is restricted (Scored)
 fi
 
@@ -2997,8 +2990,8 @@ if [ $(is_test_included 6; echo $?) -eq 0 ]; then   write_cache "6,System Mainte
         run_test 6.1.10 1 test_6.1.10   ## Ensure no world-writable files exist (Scored)
         run_test 6.1.11 1 test_6.1.11   ## Ensure no unowned files or directories exist (Scored)
         run_test 6.1.12 1 test_6.1.12   ## Ensure no ungrouped files or directories exist (Scored)
-        run_test 6.1.13 1 skip_test "Audit SUID executables"   ## 6.1.13 Audit SUID executables (Not Scored)
-        run_test 6.1.14 1 skip_test "Audit SGID executables"   ## 6.1.14 Audit SGID executables (Not Scored)
+        run_test 6.1.13 skip_test "Audit SUID executables"   ## 6.1.13 Audit SUID executables (Not Scored)
+        run_test 6.1.14 skip_test "Audit SGID executables"   ## 6.1.14 Audit SGID executables (Not Scored)
     fi
     if [ $(is_test_included 6.2; echo $?) -eq 0 ]; then   write_cache "6.2,User and Group Settings"
         run_test 6.2.1 1 test_6.2.1   ## 6.2.1 Ensure password fields are not empty (Scored)
@@ -3026,11 +3019,11 @@ fi
 
 ## Wait while all tests exit
 wait
-[ $debug == "True" ] && write_debug "All tests have completed"
+write_debug "All tests have completed"
 
 ## Output test results
 outputter
 tidy_up
 
-[ $debug == "True" ] && write_debug "Exiting with code $exit_code"
+write_debug "Exiting with code $exit_code"
 exit $exit_code
