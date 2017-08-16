@@ -1,5 +1,5 @@
 #!/bin/bash
-## andy.dustin@gmail.com [rev: a440c17]
+## andy.dustin@gmail.com [rev: a44ce5f]
 
 ## This script checks for compliance against CIS CentOS Linux 7 Benchmark v2.1.1 01-31-2017 measures
 ## Each individual standard has it's own function and is forked to the background, allowing for 
@@ -39,45 +39,59 @@ renice_bool=False
 renice_value=5
 start_time=$(date +%s)
 color=True
+test_level=0
 
 
 ### Functions ###
 ## This section defines functions used in the script 
 is_test_included() {
     id=$1
+    level=$2
+    state=0
     
     [ $debug == "True" ] && write_debug "Checking whether to run test $id"
+    
+    [ -z $level ] && level=$test_level
+    
+    ## Check if the $level is one we're going to run
+    if [ $test_level -ne 0 ]; then
+        if [ "$test_level" != "$level" ]; then
+            write_debug "Excluding level $level test $id"
+            state=1
+        fi
+    fi
     
     ## Check if there were explicitly included tests
     if [ $(echo "$include" | wc -c ) -gt 3 ]; then
         
         ## Check if the $id is in the included tests
         if [ $(echo " $include " | grep -c " $id ") -gt 0 ]; then
-            [ $debug == "True" ] && write_debug "Test $id was explicitly included"
+            write_debug "Test $id was explicitly included"
+            state=0
         elif [ $(echo " $include " | grep -c " $id\.") -gt 0 ]; then
-            [ $debug == "True" ] && write_debug "Test $id is the parent of an included test"
+            write_debug "Test $id is the parent of an included test"
+            state=0
         elif [ $(for i in $include; do echo " $id" | grep " $i\."; done | wc -l) -gt 0 ]; then
-            [ $debug == "True" ] && write_debug "Test $id is the child of an included test"
-        else
-            [ $debug == "True" ] && write_debug "Excluding test $id (Not found in the include list)"
-            return 1
+            write_debug "Test $id is the child of an included test"
+            state=0
+        elif [ $test_level == 3 ]; then
+            write_debug "Excluding test $id (Not found in the include list)"
+            state=1
         fi
     fi
     
     ## If this $id was included in the tests check it wasn't then excluded
     if [ $(echo " $exclude " | grep -c " $id ") -gt 0 ]; then
-        [ $debug == "True" ] && write_debug "Test $id was explicitly excluded"
-        [ $debug == "True" ] && write_debug "Excluding test $id (Found in the include list)"
-        return 1
+        write_debug "Excluding test $id (Found in the exclude list)"
+        state=1
     elif [ $(for i in $exclude; do echo " $id" | grep " $i\."; done | wc -l) -gt 0 ]; then
-        [ $debug == "True" ] && write_debug "Test $id is the child of an excluded test"
-        [ $debug == "True" ] && write_debug "Excluding test $id (Found in the exclude list)"
-        return 1
+        write_debug "Excluding test $id (Parent found in the exclude list)"
+        state=1
     fi
     
-    [ $debug == "True" ] && write_debug "Including test $id "
+    [ $state -eq 0 ] && write_debug "Including test $id"
     
-    return 0
+    return $state
 } ## Checks whether to run a particular test or not
 get_id() {
     echo $1 | sed -e 's/test_//' -e 's/\.x.*$//'
@@ -93,6 +107,7 @@ EOF
     cat << EOF | column -t -s'|'
 ||-h,|--help|Prints this help text
 |||--debug|Run script with debug output turned on
+|||--level (1|2) |Run tests from specified level only
 |||--include "<test_ids>"|Space delimited list of tests to include
 |||--exclude "<test_ids>"|Space delimited list of tests to exclude
 |||--nice|Lowers the CPU priority of executing tests
@@ -109,9 +124,15 @@ EOF
       
     Exclude tests from section 1.1 and 1.3.2:
       $me --exclude "1.1 1.3.2"
-
+      
     Include tests only from section 4.1 but exclude tests from section 4.1.1:
       $me --include 4.1 --exclude 4.1.1
+    
+    Run only level 2 tests
+      $me --level 2
+    
+    Run level 2 tests and some section 6 tests, but not section 6.1 tests
+      $me --level 2 --include 6 --exclude 6.1
 
 EOF
 
@@ -202,6 +223,19 @@ parse_args() {
         [ $debug == "True" ] && write_debug "Include list is empty"
     fi
     
+    ## Check arguments for --level
+    if [ $(echo $args | grep -- '--level 1' &>/dev/null; echo $?) -eq 0 ]; then
+        test_level=$(( $test_level + 1 ))
+        write_debug "Going to run Level 1 tests"
+    elif [ $(echo $args | grep -- '--level 2' &>/dev/null; echo $?) -eq 0 ]; then
+        test_level=$(( $test_level + 2 ))
+        write_debug "Going to run Level 2 tests"
+    else
+        test_level=0
+        write_debug "Going to run tests from any level"
+    fi
+    
+    
 } ## Parse arguments passed in to the script
 progress() {
     ## We don't want progress output while we're spewing debug or trace output
@@ -211,8 +245,8 @@ progress() {
     array=(\| \/ \- \\)
     
     while [ $(running_children) -gt 1 ]; do 
-        started=$(cat $started_counter)
-        finished=$(cat $finished_counter)
+        started=$( wc -l $started_counter | awk '{print $1}' )
+        finished=$( wc -l $finished_counter | awk '{print $1}' )
         running=$(( $started - $finished ))
         
         tick=$(( $tick + 1 ))
@@ -226,17 +260,18 @@ progress() {
     done
     
     ## When all tests have finished, make a final update
-    finished=$(cat $finished_counter)
+    finished=$( wc -l $finished_counter | awk '{print $1}' )
     script_duration="$(date +%T -ud @$(( $(date +%s) - $start_time )))"
     #printf "\r[✓] $finished of $finished tests completed\n" >&2
     printf "\r[$script_duration] (✓) $started of $started tests completed\n" >&2
 } ## Prints a pretty progress spinner while running tests
 run_test() {
     id=$1
-    test=$2
-    args=$(echo $@ | awk '{$1 = $2 = ""; print $0}' | sed 's/^ *//')
+    level=$2
+    test=$3
+    args=$(echo $@ | awk '{$1 = $2 = $3 = ""; print $0}' | sed 's/^ *//')
     
-    if [ $(is_test_included $id; echo $?) -eq 0 ]; then
+    if [ $(is_test_included $id $level; echo $?) -eq 0 ]; then
         [ $debug == "True" ] && write_debug "Requesting test $id by calling \"$test $id $args &\""
         
         while [ "$(pgrep -P $$ 2>/dev/null | wc -l)" -ge $max_running_tests ]; do 
@@ -248,9 +283,9 @@ run_test() {
         
         ## Don't try to thread script if trace is enabled so it's output is tidier :)
         if [ $trace == "True" ]; then
-            $test $id $args
+            $test $id $level $args
         else
-            $test $id $args &
+            $test $id $level $args &
         fi
     fi
     
@@ -274,16 +309,17 @@ setup() {
     
     [ $debug == "True" ] && write_debug "Creating tmp files with base $tmp_file_base*"
     cat /dev/null > $tmp_file
-    echo 0 > $started_counter
-    echo 0 > $finished_counter
+    cat /dev/null > $started_counter
+    cat /dev/null > $finished_counter
 } ## Sets up required files for test
 test_start() {
     id=$1
+    level=$2
     
     [ $debug == "True" ] && write_debug "Test $id started"
         
-    echo $(( $(cat $started_counter) + 1 )) > $started_counter
-    [ $debug == "True" ] && write_debug "Progress: $(cat $finished_counter)/$(cat $started_counter) tests."
+    echo "." >> $started_counter
+    [ $debug == "True" ] && write_debug "Progress: $( wc -l $finished_counter | awk '{print $1}' )/$( wc -l $started_counter | awk '{print $1}' ) tests."
     
     now
 } ## Prints debug output (when enabled) and returns current time
@@ -294,8 +330,8 @@ test_finish() {
     duration="$(( $(now) - $start_time ))"
     [ $debug == "True" ] && write_debug "Test "$id" completed after "$duration"ms"
     
-    echo $(( $(cat $finished_counter) + 1 )) > $finished_counter
-    [ $debug == "True" ] && write_debug "Progress: $(cat $finished_counter)/$(cat $started_counter) tests."
+    echo "." >> $finished_counter
+    [ $debug == "True" ] && write_debug "Progress: $( wc -l $finished_counter | awk '{print $1}' )/$( wc -l $started_counter | awk '{print $1}' ) tests."
     
     #progress_bar
     
@@ -310,7 +346,7 @@ write_cache() {
     printf "$@\n" >> $tmp_file
 } ## Writes additional rows to the output cache
 write_debug() {
-    printf "[DEBUG] $(date -Ins) $@\n" >&2
+    [ $debug == "True" ] && printf "[DEBUG] $(date -Ins) $@\n" >&2
 } ## Writes debug output to STDERR
 write_err() {
     printf "[ERROR] $@\n" >&2
@@ -330,6 +366,7 @@ skip_test() {
     ## or that rely too heavily on site policy for definition
     
     id=$1
+    level=$2
     description=$( echo $@ | awk '{$1=""; print $0}' | sed 's/^ *//')
     scored="Skipped"
     result=""
@@ -338,10 +375,10 @@ skip_test() {
 } 
 test_is_enabled() {
     id=$1
-    service=$2
-    name=$3
+    level=$2
+    service=$3
+    name=$4
     description="Ensure $name service is enabled"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -354,10 +391,10 @@ test_is_enabled() {
 }
 test_is_installed() {
     id=$1
-    pkg=$2
-    name=$3
+    level=$2
+    pkg=$3
+    name=$4
     description="Ensure $name is installed"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -370,10 +407,10 @@ test_is_installed() {
 }
 test_perms() {
     id=$1
-    perms=$2
-    file=$3
+    level=$2
+    perms=$3
+    file=$4
     description="Ensure permissions on $file are configured"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -402,9 +439,9 @@ test_perms() {
 ## Section 1 - Initial Setup
 test_1.1.1.x() {
     id=$1
-    filesystem=$2
+    level=$2
+    filesystem=$3
     description="Ensure mounting of $filesystem is disabled"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -419,9 +456,9 @@ test_1.1.1.x() {
 } 
 test_1.1.x-check_partition() {
     id=$1
-    partition=$2
+    level=$2
+    partition=$3
     description="Ensure separate partition exists for $partition"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -434,10 +471,10 @@ test_1.1.x-check_partition() {
 } 
 test_1.1.x-check_fs_opts() {
     id=$1
-    partition=$2
-    fs_opt=$3
+    level=$2
+    partition=$3
+    fs_opt=$4
     description="Ensure $fs_opt option set on $partition"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -450,9 +487,9 @@ test_1.1.x-check_fs_opts() {
 } 
 test_1.1.x-check_removable() {
     id=$1
-    fs_opt=$2
+    level=$2
+    fs_opt=$3
     description="Ensure $fs_opt option set on removable media partitions"
-    level=1
     scored="Not Scored"
     test_start_time=$(test_start $id)
     
@@ -476,8 +513,8 @@ test_1.1.x-check_removable() {
 } 
 test_1.1.21() {
     id=$1
+    level=$2
     description="Ensure sticky bit is set on all world-writable dirs"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -491,8 +528,8 @@ test_1.1.21() {
 }
 test_1.1.22() {
     id=$1
+    level=$2
     description="Disable Automounting"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -508,8 +545,8 @@ test_1.1.22() {
 }
 test_1.2.1() {
     id=$1
+    level=$2
     description="Ensure package manager repositories are configured"
-    level=1
     scored="Not Scored"
     test_start_time=$(test_start $id)
     
@@ -523,8 +560,8 @@ test_1.2.1() {
 }
 test_1.2.2() {
     id=$1
+    level=$2
     description="Ensure GPG keys are configured"
-    level=1
     scored="Not Scored"
     test_start_time=$(test_start $id)
     
@@ -537,8 +574,8 @@ test_1.2.2() {
 }
 test_1.2.3() {
     id=$1
+    level=$2
     description="Ensure gpgcheck is globally activated"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -551,8 +588,8 @@ test_1.2.3() {
 }
 test_1.3.2() {
     id=$1
+    level=$2
     description="Ensure filesystem integrity is regularly checked"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -565,8 +602,8 @@ test_1.3.2() {
 }
 test_1.4.2() {
     id=$1
+    level=$2
     description="Ensure bootloader password is set"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -583,8 +620,8 @@ test_1.4.2() {
 }
 test_1.4.3() {
     id=$1
+    level=$2
     description="Ensure authentication required for single user mode"
-    level=1
     scored="Not Scored"
     test_start_time=$(test_start $id)
     
@@ -602,8 +639,8 @@ test_1.4.3() {
 }
 test_1.5.1() {
     id=$1
+    level=$2
     description="Ensure core dumps are restricted"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -621,8 +658,8 @@ test_1.5.1() {
 }
 test_1.5.2() {
     id=$1
+    level=$2
     description="Ensure XD/NX support is enabled"
-    level=1
     scored="Not Scored"
     test_start_time=$(test_start $id)
     
@@ -639,8 +676,8 @@ test_1.5.2() {
 }
 test_1.5.3() {
     id=$1
+    level=$2
     description="Ensure address space layout randomisation (ASLR) is enabled"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -656,8 +693,8 @@ test_1.5.3() {
 }
 test_1.5.4() {
     id=$1
+    level=$2
     description="Ensure prelink is disabled"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -674,8 +711,8 @@ test_1.5.4() {
 }
 test_1.6.1.1() {
     id=$1
+    level=$2
     description="Ensure SELinux is not disabled in bootloader configuration"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -691,8 +728,8 @@ test_1.6.1.1() {
 }
 test_1.6.1.2() {
     id=$1
+    level=$2
     description="Ensure the SELinux state is enforcing"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -709,8 +746,8 @@ test_1.6.1.2() {
 }
 test_1.6.1.3() {
     id=$1
+    level=$2
     description="Ensure SELinux policy is configured"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -727,8 +764,8 @@ test_1.6.1.3() {
 }
 test_1.6.1.4() {
     id=$1
+    level=$2
     description="Ensure SETroubleshoot is not installed"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -744,8 +781,8 @@ test_1.6.1.4() {
 }
 test_1.6.1.5() {
     id=$1
+    level=$2
     description="Ensure MCS Translation Service (mcstrans) is not installed"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -761,8 +798,8 @@ test_1.6.1.5() {
 }
 test_1.6.1.6() {
     id=$1
+    level=$2
     description="Ensure no unconfined daemons exist"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -778,8 +815,8 @@ test_1.6.1.6() {
 }
 test_1.7.1.1() {
     id=$1
+    level=$2
     description="Ensure message of the day is configured properly"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -796,8 +833,8 @@ test_1.7.1.1() {
 }
 test_1.7.1.2() {
     id=$1
+    level=$2
     description="Ensure local login warning banner is configured properly"
-    level=1
     scored="Not Scored"
     test_start_time=$(test_start $id)
     
@@ -814,8 +851,8 @@ test_1.7.1.2() {
 }
 test_1.7.1.3() {
     id=$1
+    level=$2
     description="Ensure remote login warning banner is configured properly"
-    level=1
     scored="Not Scored"
     test_start_time=$(test_start $id)
     
@@ -832,8 +869,8 @@ test_1.7.1.3() {
 }
 test_1.7.2() {
     id=$1
+    level=$2
     description="Ensure GDM login banner is configured"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -861,8 +898,8 @@ test_1.7.2() {
 }
 test_1.8() {
     id=$1
+    level=$2
     description="Ensure updates are installed"
-    level=1
     scored="Not Scored"
     test_start_time="$(test_start $id)"
     
@@ -878,9 +915,9 @@ test_1.8() {
 ## Section 2 - Services
 test_2.1.x() {
     id=$1
-    service=$2
+    level=$2
+    service=$3
     description="Ensure $service services are not enabled"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -904,8 +941,8 @@ test_2.1.x() {
 }
 test_2.1.6() {
     id=$1
+    level=$2
     description="Ensure tftp server is not enabled"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -925,8 +962,8 @@ test_2.1.6() {
 }
 test_2.1.7() {
     id=$1
+    level=$2
     description="Ensure xinetd is not enabled"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -944,8 +981,8 @@ test_2.1.7() {
 
 test_2.2.1.1() {
     id=$1
+    level=$2
     description="Ensure time synchronisation is in use"
-    level=1
     scored="Not Scored"
     test_start_time="$(test_start $id)"
     
@@ -958,8 +995,8 @@ test_2.2.1.1() {
 }
 test_2.2.1.2() {
     id=$1
+    level=$2
     description="Ensure ntp is configured"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -983,8 +1020,8 @@ test_2.2.1.2() {
 }
 test_2.2.1.3() {
     id=$1
+    level=$2
     description="Ensure chrony is configured"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1010,8 +1047,8 @@ test_2.2.1.3() {
 
 test_2.2.2() {
     id=$1
+    level=$2
     description="Ensure X Window System is not installed"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1024,12 +1061,12 @@ test_2.2.2() {
 }
 test_2.2.x() {
     id=$1
-    pkg=$2
-    service=$3
-    port=$4
+    level=$2
+    pkg=$3
+    service=$4
+    port=$5
     name=$( echo $@ | awk '{$1=$2=$3=$4=""; print $0}' | sed 's/^ *//')
     description="Ensure $name is not enabled"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1047,8 +1084,8 @@ test_2.2.x() {
 }
 test_2.2.7() {
     id=$1
+    level=$2
     description="Ensure NFS and RPC are not enabled"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1070,8 +1107,8 @@ test_2.2.7() {
 }
 test_2.2.15() {
     id=$1
+    level=$2
     description="Ensure mail transfer agent is configured for local-only mode"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1084,8 +1121,8 @@ test_2.2.15() {
 }
 test_2.2.17() {
     id=$1
+    level=$2
     description="Ensure NFS and RPC are not enabled"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1110,10 +1147,10 @@ test_2.2.17() {
 
 test_2.3.x() {
     id=$1
-    pkg=$2
-    name=$3
+    level=$2
+    pkg=$3
+    name=$4
     description="Ensure $name client is not enabled"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1129,11 +1166,11 @@ test_2.3.x() {
 ## Section 3 - Network Configuration
 test_3.x-single() {
     id=$1
-    protocol=$2
-    sysctl=$3
-    val=$4
+    level=$2
+    protocol=$3
+    sysctl=$4
+    val=$5
     description=$( echo $@ | awk '{$1=$2=$3=$4=""; print $0}' | sed 's/^ *//')
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1146,11 +1183,11 @@ test_3.x-single() {
 }
 test_3.x-double() {
     id=$1
-    protocol=$2
-    sysctl=$3
-    val=$4
+    level=$2
+    protocol=$3
+    sysctl=$4
+    val=$5
     description=$( echo $@ | awk '{$1=$2=$3=$4=""; print $0}' | sed 's/^ *//')
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1165,8 +1202,8 @@ test_3.x-double() {
 }
 test_3.3.3() {
     id=$1
+    level=$2
     description="Ensure IPv6 is disabled"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1179,8 +1216,8 @@ test_3.3.3() {
 }
 test_3.4.1() {
     id=$1
+    level=$2
     description="Ensure TCP Wrappers is installed"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1196,8 +1233,8 @@ test_3.4.1() {
 }
 test_3.4.2() {
     id=$1
+    level=$2
     description="Ensure /etc/hosts.allow is configured"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1212,8 +1249,8 @@ test_3.4.2() {
 }
 test_3.4.3() {
     id=$1
+    level=$2
     description="Ensure /etc/hosts.deny is configured"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1228,9 +1265,9 @@ test_3.4.3() {
 }
 test_3.4.x() {
     id=$1
-    file=$2
+    level=$2
+    file=$3
     description="Ensure permissions on $file are configured"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1249,10 +1286,10 @@ test_3.4.x() {
 }
 test_3.5.x() {
     id=$1
-    protocol=$2
-    name=$3
+    level=$2
+    protocol=$3
+    name=$4
     description="Ensure mounting of $name is disabled"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1267,8 +1304,8 @@ test_3.5.x() {
 } 
 test_3.6.2() {
     id=$1
+    level=$2
     description="Ensure default deny firewall policy"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1285,8 +1322,8 @@ test_3.6.2() {
 } 
 test_3.6.3() {
     id=$1
+    level=$2
     description="Ensure loopback traffic is configured"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1307,8 +1344,8 @@ test_3.6.3() {
 } 
 test_3.6.4() {
     id=$1
+    level=$2
     description="Ensure outbound and established connections are configured"
-    level=1
     scored="Not Scored"
     test_start_time=$(test_start $id)
     
@@ -1327,8 +1364,8 @@ test_3.6.4() {
 ## Section 4 - Logging and Auditing
 test_4.1.1.1() {
     id=$1
+    level=$2
     description="Ensure audit log storage size is configured"
-    level=2
     scored="Not Scored"
     test_start_time=$(test_start $id)
     
@@ -1341,8 +1378,8 @@ test_4.1.1.1() {
 }
 test_4.1.1.2() {
     id=$1
+    level=$2
     description="Ensure system is disabled when audit logs are full"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1358,8 +1395,8 @@ test_4.1.1.2() {
 }
 test_4.1.1.3() {
     id=$1
+    level=$2
     description="Ensure audit logs are not automatically deleted"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1373,8 +1410,8 @@ test_4.1.1.3() {
 
 test_4.1.2() {
     id=$1
+    level=$2
     description="Ensure auditd service is enabled"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1387,8 +1424,8 @@ test_4.1.2() {
 }
 test_4.1.3() {
     id=$1
+    level=$2
     description="Ensure auditing for processes that start prior to auditd is enabled"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1403,8 +1440,8 @@ test_4.1.3() {
 }
 test_4.1.4() {
     id=$1
+    level=$2
     description="Ensure events that modify date and time information are collected"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1424,8 +1461,8 @@ test_4.1.4() {
 }
 test_4.1.5() {
     id=$1
+    level=$2
     description="Ensure events that modify user/group information are collected"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1445,8 +1482,8 @@ test_4.1.5() {
 }
 test_4.1.6() {
     id=$1
+    level=$2
     description="Ensure events that modify the system's network environment are collected"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1467,8 +1504,8 @@ test_4.1.6() {
 }
 test_4.1.7() {
     id=$1
+    level=$2
     description="Ensure events that modify the system's Mandatory Access Controls are collected"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1484,8 +1521,8 @@ test_4.1.7() {
 }
 test_4.1.8() {
     id=$1
+    level=$2
     description="Ensure login and logout events are collected"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1502,8 +1539,8 @@ test_4.1.8() {
 }
 test_4.1.9() {
     id=$1
+    level=$2
     description="Ensure session initiation information is collected"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1521,8 +1558,8 @@ test_4.1.9() {
 }
 test_4.1.10() {
     id=$1
+    level=$2
     description="Ensure discretionary access control permission modification events are collected"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1543,8 +1580,8 @@ test_4.1.10() {
 }
 test_4.1.11() {
     id=$1
+    level=$2
     description="Ensure unsuccessful unauthorised file access attempts are collected"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1563,8 +1600,8 @@ test_4.1.11() {
 }
 test_4.1.13() {
     id=$1
+    level=$2
     description="Ensure successful filesystem mounts are collected"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1581,8 +1618,8 @@ test_4.1.13() {
 }
 test_4.1.14() {
     id=$1
+    level=$2
     description="Ensure file deletion events by users are collected"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1599,8 +1636,8 @@ test_4.1.14() {
 }
 test_4.1.15() {
     id=$1
+    level=$2
     description="Ensure changes to system administration scope (sudoers) is collected"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1617,8 +1654,8 @@ test_4.1.15() {
 }
 test_4.1.16() {
     id=$1
+    level=$2
     description="Ensure system administrator actions (sudolog) are collected"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1634,8 +1671,8 @@ test_4.1.16() {
 }
 test_4.1.17() {
     id=$1
+    level=$2
     description="Ensure kernel module loading and unloading is collected"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1654,8 +1691,8 @@ test_4.1.17() {
 }
 test_4.1.18() {
     id=$1
+    level=$2
     description="Ensure the audit configuration is immutable"
-    level=2
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1669,8 +1706,8 @@ test_4.1.18() {
 
 test_4.2.1.3() {
     id=$1
+    level=$2
     description="Ensure rsyslog default file permissions configured"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1683,8 +1720,8 @@ test_4.2.1.3() {
 }
 test_4.2.1.4() {
     id=$1
+    level=$2
     description="Ensure rsyslog is configured to send logs to a remote host"
-    level=1
     scored="Not Scored"
     test_start_time=$(test_start $id)
     
@@ -1698,8 +1735,8 @@ test_4.2.1.4() {
 
 test_4.2.2.3() {
     id=$1
+    level=$2
     description="Ensure syslog-ng default file permissions configured"
-    level=1
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -1712,8 +1749,8 @@ test_4.2.2.3() {
 }
 test_4.2.2.4() {
     id=$1
+    level=$2
     description="Ensure syslog-ng is configured to send logs to a remote host"
-    level=1
     scored="Not Scored"
     test_start_time=$(test_start $id)
     
@@ -1729,8 +1766,8 @@ test_4.2.2.4() {
 
 test_4.2.3() {
     id=$1
+    level=$2
     description="Ensure rsyslog or syslog-ng is installed"
-    level=1
     scored="Not Scored"
     test_start_time="$(test_start $id)"
     
@@ -1743,8 +1780,8 @@ test_4.2.3() {
 }
 test_4.2.4() {
     id=$1
+    level=$2
     description="Ensure permissions on log files are configured"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1760,8 +1797,8 @@ test_4.2.4() {
 ## Section 5 - Access, Authentication and Authorization
 test_5.1.8() {
     id=$1
+    level=$2
     description="Ensure at/cron is restricted to authorised users"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1783,8 +1820,8 @@ test_5.1.8() {
 
 test_5.2.2() {
     id=$1
+    level=$2
     description="Ensure SSH Protocol is set to 2"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1797,8 +1834,8 @@ test_5.2.2() {
 }
 test_5.2.3() {
     id=$1
+    level=$2
     description="Ensure SSH LogLevel is set to INFO"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1811,8 +1848,8 @@ test_5.2.3() {
 }
 test_5.2.4() {
     id=$1
+    level=$2
     description="Ensure SSH X11 forwarding is disabled"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1825,8 +1862,8 @@ test_5.2.4() {
 }
 test_5.2.5() {
     id=$1
+    level=$2
     description="Ensure SSH MaxAuthTries is set to 4 or less"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1839,8 +1876,8 @@ test_5.2.5() {
 }
 test_5.2.6() {
     id=$1
+    level=$2
     description="Ensure SSH IgnoreRhosts is enabled"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1853,8 +1890,8 @@ test_5.2.6() {
 }
 test_5.2.7() {
     id=$1
+    level=$2
     description="Ensure SSH HostbasedAuthentication is disabled"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1867,8 +1904,8 @@ test_5.2.7() {
 }
 test_5.2.8() {
     id=$1
+    level=$2
     description="Ensure SSH root login is disabled"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1881,8 +1918,8 @@ test_5.2.8() {
 }
 test_5.2.9() {
     id=$1
+    level=$2
     description="Ensure SSH PermitEmptyPasswords is disabled"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1895,8 +1932,8 @@ test_5.2.9() {
 }
 test_5.2.10() {
     id=$1
+    level=$2
     description="Ensure SSH PermitUserEnvironment is disabled"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1909,8 +1946,8 @@ test_5.2.10() {
 }
 test_5.2.11() {
     id=$1
+    level=$2
     description="Ensure only approved ciphers are used"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1923,8 +1960,8 @@ test_5.2.11() {
 }
 test_5.2.12() {
     id=$1
+    level=$2
     description="Ensure only approved MAC algorithms are used"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1937,8 +1974,8 @@ test_5.2.12() {
 }
 test_5.2.13() {
     id=$1
+    level=$2
     description="Ensure SSH Idle Timeout Interval is configured"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1957,8 +1994,8 @@ test_5.2.13() {
 }
 test_5.2.14() {
     id=$1
+    level=$2
     description="Ensure SSH LoginGraceTime is set to one minute or less"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1975,8 +2012,8 @@ test_5.2.14() {
 }
 test_5.2.16() {
     id=$1
+    level=$2
     description="Ensure SSH warning banner is configured"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1990,8 +2027,8 @@ test_5.2.16() {
 
 test_5.3.1() {
     id=$1
+    level=$2
     description="Ensure password creation requirements are configured"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2024,15 +2061,15 @@ test_5.3.1() {
 }
 test_5.3.3() {
     id=$1
+    level=$2
     description="Ensure password reuse is limited"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
     for file in /etc/pam.d/password-auth /etc/pam.d/system-auth; do
-        if [ $(egrep -c "^password\s+sufficient\s+pam_unix.so" $file) -eq 1 ]; then
-            [ $(egrep "^password\s+sufficient\s+pam_unix.so" $file | sed -e 's/^.*remember=//' -e's/\s.*$//' ) -ge 5 ] || state=1
+        if [ $(egrep -c "^password\s+sufficient\s+pam_unix.so.*remember=" $file) -eq 1 ]; then
+            [ "$(egrep "^password\s+sufficient\s+pam_unix.so" $file | sed -e 's/^.*remember=//' -e's/\s.*$//' )" -ge 5 ] || state=1
         else
             state=1
         fi
@@ -2046,8 +2083,8 @@ test_5.3.3() {
 }
 test_5.3.4() {
     id=$1
+    level=$2
     description="Ensure password hashing algorithm is SHA-512"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2064,8 +2101,8 @@ test_5.3.4() {
 
 test_5.4.1.1() {
     id=$1
+    level=$2
     description="Ensure password expiration is 90 days or less"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2090,8 +2127,8 @@ test_5.4.1.1() {
 }
 test_5.4.1.2() {
     id=$1
+    level=$2
     description="Ensure minimum days between password changes is 7 or more"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2116,8 +2153,8 @@ test_5.4.1.2() {
 }
 test_5.4.1.3() {
     id=$1
+    level=$2
     description="Ensure password expiration warning days is 7 or more"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2142,8 +2179,8 @@ test_5.4.1.3() {
 }
 test_5.4.1.4() {
     id=$1
+    level=$2
     description="Ensure inactive password lock is 30 days or less"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2170,8 +2207,8 @@ test_5.4.1.4() {
 
 test_5.4.2() {
     id=$1
+    level=$2
     description="Ensure system accounts are non-login"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2184,8 +2221,8 @@ test_5.4.2() {
 }
 test_5.4.3() {
     id=$1
+    level=$2
     description="Ensure default group for the root account is GID 0"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2198,8 +2235,8 @@ test_5.4.3() {
 }
 test_5.4.4() {
     id=$1
+    level=$2
     description="Ensure default user umask is 027 or more restrictive"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2215,8 +2252,8 @@ test_5.4.4() {
 
 test_5.6() {
     id=$1
+    level=$2
     description="Ensure access to the su command is restricted"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2235,8 +2272,8 @@ test_5.6() {
 
 test_6.1.1() {
     id=$1
+    level=$2
     description="Audit system file permissions"
-    level=2
     scored="Not Scored"
     test_start_time="$(test_start $id)"
     
@@ -2251,8 +2288,8 @@ test_6.1.1() {
 }
 test_6.1.10() {
     id=$1
+    level=$2
     description="Ensure no world writable files exist"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2267,8 +2304,8 @@ test_6.1.10() {
 }
 test_6.1.11() {
     id=$1
+    level=$2
     description="Ensure no unowned files or directories exist"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2283,8 +2320,8 @@ test_6.1.11() {
 }
 test_6.1.12() {
     id=$1
+    level=$2
     description="Ensure no ungrouped files or directories exist"
-    level=1
     scored="Not Scored"
     test_start_time="$(test_start $id)"
     
@@ -2300,8 +2337,8 @@ test_6.1.12() {
 
 test_6.2.1() {
     id=$1
+    level=$2
     description="Ensure password fields are not empty"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2316,9 +2353,9 @@ test_6.2.1() {
 }
 test_6.2.x-legacy_entries() {
     id=$1
-    file=$2
+    level=$2
+    file=$3
     description="Ensure no legacy "+" entries exists in $file"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2333,8 +2370,8 @@ test_6.2.x-legacy_entries() {
 }
 test_6.2.5() {
     id=$1
+    level=$2
     description="Ensure root is the only UID 0 account"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2349,8 +2386,8 @@ test_6.2.5() {
 }
 test_6.2.6() {
     id=$1
+    level=$2
     description="Ensure root PATH integrity"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2381,8 +2418,8 @@ test_6.2.6() {
 }
 test_6.2.7() {
     id=$1
+    level=$2
     description="Ensure all users' home directories exist"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2400,8 +2437,8 @@ test_6.2.7() {
 }
 test_6.2.8() {
     id=$1
+    level=$2
     description="Ensure users' home directories permissions are 750 or more restrictive"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2423,8 +2460,8 @@ test_6.2.8() {
 }
 test_6.2.9() {
     id=$1
+    level=$2
     description="Ensure users own their own home directories"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2444,8 +2481,8 @@ test_6.2.9() {
 }
 test_6.2.10() {
     id=$1
+    level=$2
     description="Ensure users' dot files are not group or world writable"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2469,8 +2506,8 @@ test_6.2.10() {
 }
 test_6.2.11() {
     id=$1
+    level=$2
     description="Ensure no users have .forward files"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2487,8 +2524,8 @@ test_6.2.11() {
 }
 test_6.2.12() {
     id=$1
+    level=$2
     description="Ensure no users have .netrc files"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2505,8 +2542,8 @@ test_6.2.12() {
 }
 test_6.2.13() {
     id=$1
+    level=$2
     description="Ensure no users have .netrc files"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2532,8 +2569,8 @@ test_6.2.13() {
 }
 test_6.2.14() {
     id=$1
+    level=$2
     description="Ensure no users have .rhosts files"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2550,8 +2587,8 @@ test_6.2.14() {
 }
 test_6.2.15() {
     id=$1
+    level=$2
     description="Ensure all groups in /etc/passwd exist in /etc/group"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2569,8 +2606,8 @@ test_6.2.15() {
 }
 test_6.2.16() {
     id=$1
+    level=$2
     description="Ensure no duplicate UIDs exist"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2585,8 +2622,8 @@ test_6.2.16() {
 }
 test_6.2.17() {
     id=$1
+    level=$2
     description="Ensure no duplicate GIDs exist"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2601,8 +2638,8 @@ test_6.2.17() {
 }
 test_6.2.18() {
     id=$1
+    level=$2
     description="Ensure no duplicate user names exist"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2617,8 +2654,8 @@ test_6.2.18() {
 }
 test_6.2.19() {
     id=$1
+    level=$2
     description="Ensure no duplicate group names exist"
-    level=1
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -2654,335 +2691,335 @@ if [ $(is_test_included 1; echo $?) -eq 0 ]; then   write_cache "1,Initial Setup
         
         ## Section 1.1.1 - Disable unused filesystems
         if [ $(is_test_included 1.1.1; echo $?) -eq 0 ]; then   write_cache "1.1.1,Disable unused filesystems"
-            run_test 1.1.1.1 test_1.1.1.x cramfs   ## Ensure mounting of cramfs is disabled
-            run_test 1.1.1.2 test_1.1.1.x freevxfs    ## Ensure mounting of freevxfs is disabled
-            run_test 1.1.1.3 test_1.1.1.x jffs2   ## Ensure mounting of jffs2 is disabled
-            run_test 1.1.1.4 test_1.1.1.x hfs   ## Ensure mounting of hfs is disabled
-            run_test 1.1.1.5 test_1.1.1.x hfsplus   ## Ensure mounting of hfsplus is disabled
-            run_test 1.1.1.6 test_1.1.1.x squashfs   ## Ensure mounting of squashfs is disabled
-            run_test 1.1.1.7 test_1.1.1.x udf   ## Ensure mounting of udf is disabled
-            run_test 1.1.1.8 test_1.1.1.x vfat   ## Ensure mounting of vfat is disabled
+            run_test 1.1.1.1 1 test_1.1.1.x cramfs   ## Ensure mounting of cramfs is disabled
+            run_test 1.1.1.2 1 test_1.1.1.x freevxfs    ## Ensure mounting of freevxfs is disabled
+            run_test 1.1.1.3 1 test_1.1.1.x jffs2   ## Ensure mounting of jffs2 is disabled
+            run_test 1.1.1.4 1 test_1.1.1.x hfs   ## Ensure mounting of hfs is disabled
+            run_test 1.1.1.5 1 test_1.1.1.x hfsplus   ## Ensure mounting of hfsplus is disabled
+            run_test 1.1.1.6 1 test_1.1.1.x squashfs   ## Ensure mounting of squashfs is disabled
+            run_test 1.1.1.7 1 test_1.1.1.x udf   ## Ensure mounting of udf is disabled
+            run_test 1.1.1.8 1 test_1.1.1.x vfat   ## Ensure mounting of vfat is disabled
         fi
-        run_test 1.1.2 test_1.1.x-check_partition /tmp   ## 1.1.2 Ensure separate partition exists for /tmp
-        run_test 1.1.3 test_1.1.x-check_fs_opts /tmp nodev   ## 1.1.3 Ensure nodev option set on /tmp
-        run_test 1.1.4 test_1.1.x-check_fs_opts /tmp nosuid   ## 1.1.4 Ensure nosuid option set on /tmp
-        run_test 1.1.5 test_1.1.x-check_fs_opts /tmp noexec   ## 1.1.5 Ensure noexec option set on /tmp
-        run_test 1.1.6 test_1.1.x-check_partition /var   ## 1.1.6 Ensure separate partition exists for /var
-        run_test 1.1.7 test_1.1.x-check_partition /var/tmp   ## 1.1.7 Ensure separate partition exists for /var/tmp
-        run_test 1.1.8 test_1.1.x-check_fs_opts /var/tmp nodev   ## 1.1.8 Ensure nodev option set on /var/tmp
-        run_test 1.1.9 test_1.1.x-check_fs_opts /var/tmp nosuid   ## 1.1.9 Ensure nosuid option set on /var/tmp
-        run_test 1.1.10 test_1.1.x-check_fs_opts /var/tmp noexec   ## 1.1.10 Ensure noexec option set on /var/tmp
-        run_test 1.1.11 test_1.1.x-check_partition /var/log   ## 1.1.11 Ensure separate partition exists for /var/log
-        run_test 1.1.12 test_1.1.x-check_partition /var/log/audit   ## 1.1.12 Ensure separate partition exists for /var/log/audit
-        run_test 1.1.13 test_1.1.x-check_partition /home   ## 1.1.13 Ensure separate partition exists for /home
-        run_test 1.1.14 test_1.1.x-check_fs_opts /home nodev   ## 1.1.14 Ensure nodev option set on /home
-        run_test 1.1.15 test_1.1.x-check_fs_opts /dev/shm nodev   ## 1.1.15 Ensure nodev option set on /dev/shm
-        run_test 1.1.16 test_1.1.x-check_fs_opts /dev/shm nosuid   ## 1.1.16 Ensure nosuid option set on /dev/shm
-        run_test 1.1.17 test_1.1.x-check_fs_opts /dev/shm noexec   ## 1.1.17 Ensure noexec option set on /dev/shm
-        run_test 1.1.18 test_1.1.x-check_removable nodev  ## 1.1.18 Ensure nodev option set on removable media partitions
-        run_test 1.1.19 test_1.1.x-check_removable nosuid  ## 1.1.19 Ensure nosuid option set on removable media partitions
-        run_test 1.1.20 test_1.1.x-check_removable noexec  ## 1.1.20 Ensure noexec option set on removable media partitions
-        run_test 1.1.21 test_1.1.21   ## 1.1.21 Ensure Sticky bit is set on all world-writable dirs
-        run_test 1.1.22 test_1.1.22   ## 1.1.22 Disable Automounting
+        run_test 1.1.2 2 test_1.1.x-check_partition /tmp   ## 1.1.2 Ensure separate partition exists for /tmp
+        run_test 1.1.3 1 test_1.1.x-check_fs_opts /tmp nodev   ## 1.1.3 Ensure nodev option set on /tmp
+        run_test 1.1.4 1 test_1.1.x-check_fs_opts /tmp nosuid   ## 1.1.4 Ensure nosuid option set on /tmp
+        run_test 1.1.5 1 test_1.1.x-check_fs_opts /tmp noexec   ## 1.1.5 Ensure noexec option set on /tmp
+        run_test 1.1.6 2 test_1.1.x-check_partition /var   ## 1.1.6 Ensure separate partition exists for /var
+        run_test 1.1.7 2 test_1.1.x-check_partition /var/tmp   ## 1.1.7 Ensure separate partition exists for /var/tmp
+        run_test 1.1.8 1 test_1.1.x-check_fs_opts /var/tmp nodev   ## 1.1.8 Ensure nodev option set on /var/tmp
+        run_test 1.1.9 1 test_1.1.x-check_fs_opts /var/tmp nosuid   ## 1.1.9 Ensure nosuid option set on /var/tmp
+        run_test 1.1.10 1 test_1.1.x-check_fs_opts /var/tmp noexec   ## 1.1.10 Ensure noexec option set on /var/tmp
+        run_test 1.1.11 2 test_1.1.x-check_partition /var/log   ## 1.1.11 Ensure separate partition exists for /var/log
+        run_test 1.1.12 2 test_1.1.x-check_partition /var/log/audit   ## 1.1.12 Ensure separate partition exists for /var/log/audit
+        run_test 1.1.13 2 test_1.1.x-check_partition /home   ## 1.1.13 Ensure separate partition exists for /home
+        run_test 1.1.14 1 test_1.1.x-check_fs_opts /home nodev   ## 1.1.14 Ensure nodev option set on /home
+        run_test 1.1.15 1 test_1.1.x-check_fs_opts /dev/shm nodev   ## 1.1.15 Ensure nodev option set on /dev/shm
+        run_test 1.1.16 1 test_1.1.x-check_fs_opts /dev/shm nosuid   ## 1.1.16 Ensure nosuid option set on /dev/shm
+        run_test 1.1.17 1 test_1.1.x-check_fs_opts /dev/shm noexec   ## 1.1.17 Ensure noexec option set on /dev/shm
+        run_test 1.1.18 1 test_1.1.x-check_removable nodev  ## 1.1.18 Ensure nodev option set on removable media partitions
+        run_test 1.1.19 1 test_1.1.x-check_removable nosuid  ## 1.1.19 Ensure nosuid option set on removable media partitions
+        run_test 1.1.20 1 test_1.1.x-check_removable noexec  ## 1.1.20 Ensure noexec option set on removable media partitions
+        run_test 1.1.21 1 test_1.1.21   ## 1.1.21 Ensure Sticky bit is set on all world-writable dirs
+        run_test 1.1.22 1 test_1.1.22   ## 1.1.22 Disable Automounting
     fi
     
     ## Section 1.2 - Configure Software Updates
     if [ $(is_test_included 1.2; echo $?) -eq 0 ]; then   write_cache "1.2,Configure Software Updates"
-        run_test 1.2.1 test_1.2.1   ## 1.2.1 Ensure package manager repositories are configured
-        run_test 1.2.2 test_1.2.2   ## 1.2.2 Ensure GPG keys are configured
-        run_test 1.2.3 test_1.2.3   ## 1.2.3 Ensure gpgcheck is globally activated    
+        run_test 1.2.1 1 test_1.2.1   ## 1.2.1 Ensure package manager repositories are configured
+        run_test 1.2.2 1 test_1.2.2   ## 1.2.2 Ensure GPG keys are configured
+        run_test 1.2.3 1 test_1.2.3   ## 1.2.3 Ensure gpgcheck is globally activated    
     fi
     
     ## Section 1.3 - Filesystem Integrity Checking
     if [ $(is_test_included 1.3; echo $?) -eq 0 ]; then   write_cache "1.3,Filesystem Integrity Checking"
-        run_test 1.3.1 test_is_installed aide AIDE   ## 1.3.1 Ensure AIDE is installed
-        run_test 1.3.2 test_1.3.2   ## 1.3.2 Ensure filesystem integrity is regularly checked
+        run_test 1.3.1 1 test_is_installed aide AIDE   ## 1.3.1 Ensure AIDE is installed
+        run_test 1.3.2 1 test_1.3.2   ## 1.3.2 Ensure filesystem integrity is regularly checked
     fi
     
     ## Section 1.4 - Secure Boot Settings
     if [ $(is_test_included 1.4; echo $?) -eq 0 ]; then   write_cache "1.4,Secure Boot Settings"
-        run_test 1.4.1 test_perms 600 /boot/grub2/grub.cfg   ## 1.4.1 Ensure permissions on bootloader config are configured
-        run_test 1.4.2 test_1.4.2   ## 1.4.2 Ensure bootloader password is set
-        run_test 1.4.3 test_1.4.3   ## 1.4.3 Ensure authentication requires for single user mode
+        run_test 1.4.1 1 test_perms 600 /boot/grub2/grub.cfg   ## 1.4.1 Ensure permissions on bootloader config are configured
+        run_test 1.4.2 1 test_1.4.2   ## 1.4.2 Ensure bootloader password is set
+        run_test 1.4.3 1 test_1.4.3   ## 1.4.3 Ensure authentication requires for single user mode
     
     fi
     
     ## Section 1.5 - Additional Process Hardening
     if [ $(is_test_included 1.5; echo $?) -eq 0 ]; then   write_cache "1.5,Additional Process Hardening"
-        run_test 1.5.1 test_1.5.1   ## 1.5.1 Ensure core dumps are restricted
-        run_test 1.5.2 test_1.5.2   ## 1.5.2 Ensure XD/NX support is enabled
-        run_test 1.5.3 test_1.5.3   ## 1.5.3 Ensure address space layout randomisation (ASLR) is enabled
-        run_test 1.5.4 test_1.5.4   ## 1.5.4 Ensure prelink is disabled
+        run_test 1.5.1 1 test_1.5.1   ## 1.5.1 Ensure core dumps are restricted
+        run_test 1.5.2 1 test_1.5.2   ## 1.5.2 Ensure XD/NX support is enabled
+        run_test 1.5.3 1 test_1.5.3   ## 1.5.3 Ensure address space layout randomisation (ASLR) is enabled
+        run_test 1.5.4 1 test_1.5.4   ## 1.5.4 Ensure prelink is disabled
     
     fi
     
     ## Section 1.6 - Mandatory Access Control
     if [ $(is_test_included 1.6; echo $?) -eq 0 ]; then   write_cache "1.6,Mandatory Access Control"
         if [ $(is_test_included 1.6.1; echo $?) -eq 0 ]; then   write_cache "1.6.1,Configure SELinux"
-            run_test 1.6.1.1 test_1.6.1.1   ## 1.6.1.1 Ensure SELinux is not disabled in bootloader configuration
-            run_test 1.6.1.2 test_1.6.1.2   ## 1.6.1.2 Ensure the SELinux state is enforcing
-            run_test 1.6.1.3 test_1.6.1.3   ## 1.6.1.3 Ensure SELinux policy is configured
-            run_test 1.6.1.4 test_1.6.1.4   ## 1.6.1.4 Ensure SETroubleshoot is not installed
-            run_test 1.6.1.5 test_1.6.1.5   ## 1.6.1.5 Ensure MCS Translation Service (mcstrans) is not installed
-            run_test 1.6.1.6 test_1.6.1.6   ## 1.6.1.5 Ensure no unconfined daemons exist
+            run_test 1.6.1.1 2 test_1.6.1.1   ## 1.6.1.1 Ensure SELinux is not disabled in bootloader configuration
+            run_test 1.6.1.2 2 test_1.6.1.2   ## 1.6.1.2 Ensure the SELinux state is enforcing
+            run_test 1.6.1.3 2 test_1.6.1.3   ## 1.6.1.3 Ensure SELinux policy is configured
+            run_test 1.6.1.4 2 test_1.6.1.4   ## 1.6.1.4 Ensure SETroubleshoot is not installed
+            run_test 1.6.1.5 2 test_1.6.1.5   ## 1.6.1.5 Ensure MCS Translation Service (mcstrans) is not installed
+            run_test 1.6.1.6 2 test_1.6.1.6   ## 1.6.1.5 Ensure no unconfined daemons exist
         fi
-        run_test 1.6.2 test_is_installed libselinux SELinux   ## 1.6.2 Ensure SELinux is installed
+        run_test 1.6.2 2 test_is_installed libselinux SELinux   ## 1.6.2 Ensure SELinux is installed
     fi
     
     ## Section 1.7 - Warning Banners
     if [ $(is_test_included 1.7; echo $?) -eq 0 ]; then   write_cache "1.7,Warning Banners"
         if [ $(is_test_included 1.7.1; echo $?) -eq 0 ]; then   write_cache "1.7.1,Command Line Warning Banners"
-            run_test 1.7.1.1 test_1.7.1.1   ## 1.7.1.1 Ensure message of the day is configured properly (Scored)
-            run_test 1.7.1.2 test_1.7.1.2   ## 1.7.1.2 Ensure local login warning banner is configured properly (Not Scored)
-            run_test 1.7.1.3 test_1.7.1.3   ## 1.7.1.3 Ensure remote login warning banner is configured properly (Not Scored)
-            run_test 1.7.1.4 test_perms 644 /etc/motd   ## 1.7.1.4 Ensure permissions on /etc/motd are configured (Not Scored)
-            run_test 1.7.1.5 test_perms 644 /etc/issue   ## 1.7.1.5 Ensure permissions on /etc/issue are configured (Scored)
-            run_test 1.7.1.6 test_perms 644 /etc/issue.net   ## 1.7.1.6 Ensure permissions on /etc/issue.net are configured (Not Scored)
+            run_test 1.7.1.1 1 test_1.7.1.1   ## 1.7.1.1 Ensure message of the day is configured properly (Scored)
+            run_test 1.7.1.2 1 test_1.7.1.2   ## 1.7.1.2 Ensure local login warning banner is configured properly (Not Scored)
+            run_test 1.7.1.3 1 test_1.7.1.3   ## 1.7.1.3 Ensure remote login warning banner is configured properly (Not Scored)
+            run_test 1.7.1.4 1 test_perms 644 /etc/motd   ## 1.7.1.4 Ensure permissions on /etc/motd are configured (Not Scored)
+            run_test 1.7.1.5 1 test_perms 644 /etc/issue   ## 1.7.1.5 Ensure permissions on /etc/issue are configured (Scored)
+            run_test 1.7.1.6 1 test_perms 644 /etc/issue.net   ## 1.7.1.6 Ensure permissions on /etc/issue.net are configured (Not Scored)
         fi
-        run_test 1.7.2 test_1.7.2   ## 1.7.2 Ensure GDM login banner is configured (Scored)
+        run_test 1.7.2 1 test_1.7.2   ## 1.7.2 Ensure GDM login banner is configured (Scored)
     fi
     
-    run_test 1.8 test_1.8   ## 1.8 Ensure updates, patches, and additional security software are installed (Not Scored) 
+    run_test 1.8 1 test_1.8   ## 1.8 Ensure updates, patches, and additional security software are installed (Not Scored) 
 fi
 
 ## Section 2 - Services
 if [ $(is_test_included 2; echo $?) -eq 0 ]; then   write_cache "2,Services"
     if [ $(is_test_included 2.1; echo $?) -eq 0 ]; then   write_cache "2.1,inetd Services"
-        run_test 2.1.1 test_2.1.x chargen   ## Ensure chargen services are not enabled (Scored)
-        run_test 2.1.2 test_2.1.x daytime   ## Ensure daytime services are not enabled (Scored)
-        run_test 2.1.3 test_2.1.x discord   ## Ensure discord services are not enabled (Scored)
-        run_test 2.1.4 test_2.1.x echo   ## Ensure echo services are not enabled (Scored)
-        run_test 2.1.5 test_2.1.x time   ## Ensure time services are not enabled (Scored)
-        run_test 2.1.6 test_2.1.6   ## Ensure tftp is not enabled (Scored)
-        run_test 2.1.7 test_2.1.7   ## Ensure xinetd is not enabled (Scored)
+        run_test 2.1.1 1 test_2.1.x chargen   ## Ensure chargen services are not enabled (Scored)
+        run_test 2.1.2 1 test_2.1.x daytime   ## Ensure daytime services are not enabled (Scored)
+        run_test 2.1.3 1 test_2.1.x discord   ## Ensure discord services are not enabled (Scored)
+        run_test 2.1.4 1 test_2.1.x echo   ## Ensure echo services are not enabled (Scored)
+        run_test 2.1.5 1 test_2.1.x time   ## Ensure time services are not enabled (Scored)
+        run_test 2.1.6 1 test_2.1.6   ## Ensure tftp is not enabled (Scored)
+        run_test 2.1.7 1 test_2.1.7   ## Ensure xinetd is not enabled (Scored)
     fi 
     if [ $(is_test_included 2.2; echo $?) -eq 0 ]; then   write_cache "2.2,Special Purpose Services"
         if [ $(is_test_included 2.2.1; echo $?) -eq 0 ]; then   write_cache "2.2.1,Time Synchronisation"
-            run_test 2.2.1.1 test_2.2.1.1   ## 2.2.1.1 Ensure time synchronisation is in use (Not Scored)
-            run_test 2.2.1.2 test_2.2.1.2   ## 2.2.1.2 Ensure ntp is configured (Scored)
-            run_test 2.2.1.3 test_2.2.1.3   ## 2.2.1.3 Ensure chrony is configured (Scored)
+            run_test 2.2.1.1 1 test_2.2.1.1   ## 2.2.1.1 Ensure time synchronisation is in use (Not Scored)
+            run_test 2.2.1.2 1 test_2.2.1.2   ## 2.2.1.2 Ensure ntp is configured (Scored)
+            run_test 2.2.1.3 1 test_2.2.1.3   ## 2.2.1.3 Ensure chrony is configured (Scored)
         fi
-        run_test 2.2.2 test_2.2.2   ## 2.2.2 Ensure X Window System is not installed (Scored)
-        run_test 2.2.3 test_2.2.x avahi avahi-daemon.service "5353" Avahi Server   ## 2.2.4 Ensure Avahi Server is not enabled (Scored)
-        run_test 2.2.4 test_2.2.x cups cups.service "631" CUPS   ## 2.2.4 Ensure CUPS is not enabled (Scored)
-        run_test 2.2.5 test_2.2.x dhcp dhcpd.service "67" DHCP   ## 2.2.5 Ensure DHCP server is not enabled (Scored)
-        run_test 2.2.6 test_2.2.x openldap-servers slapd.service "583|:636" LDAP   ## 2.2.6 Ensure LDAP server is not enabled (Scored)
-        run_test 2.2.7 test_2.2.7   ## 2.2.7 Ensure NFS and RPC are not enabled (Scored)
-        run_test 2.2.8 test_2.2.x bind named.service "53" DNS   ## 2.2.8 Ensure LDAP server is not enabled (Scored)
-        run_test 2.2.9 test_2.2.x vsftpd vsftpd.service "21" FTP   ## 2.2.9 Ensure FTP server is not enabled (Scored)
-        run_test 2.2.10 test_2.2.x httpd httpd.service "80|:443" HTTP   ## 2.2.10 Ensure HTTP server is not enabled (Scored)
-        run_test 2.2.11 test_2.2.x dovecot dovecot.service "110|:143|:587|:993|:995" IMAP and POP   ## 2.2.11 Ensure IMAP and POP server is not enabled (Scored)
-        run_test 2.2.12 test_2.2.x samba smb.service "445" Samba   ## 2.2.12 Ensure Samba server is not enabled (Scored)
-        run_test 2.2.13 test_2.2.x squid squid.service "3128|:80|:443" HTTP Proxy   ## 2.2.13 Ensure HTTP Proxy Server is not enabled (Scored)
-        run_test 2.2.14 test_2.2.x net-snmp snmpd.service "161" SNMP   ## 2.2.14 Ensure SNMP Server is not enabled (Scored)
-        run_test 2.2.15 test_2.2.15   ## Ensure mail transfer agent is configured for local-only mode (Scored)
-        run_test 2.2.16 test_2.2.x ypserv ypserv.service "789" NIS   ## Ensure NIS Server is not enabled (Scored)
-        run_test 2.2.17 test_2.2.17   ## Ensure rsh server is not enabled (Scored)
-        run_test 2.2.18 test_2.2.x telnet-server telnet.socket "23" telnet   ## Ensure telnet server is not enabled (Scored)
-        run_test 2.2.19 test_2.2.x tftp-server tftp.socket "69" tfp   ## Ensure tftp server is not enabled (Scored)
-        run_test 2.2.20 test_2.2.x rsync rsyncd.service "873" rsync   ## Ensure rsync service is not enabled (Scored)
-        run_test 2.2.21 test_2.2.x talk-server ntalk.service "517" talk   ## Ensure talk server is not enabled (Scored)
+        run_test 2.2.2 1 test_2.2.2   ## 2.2.2 Ensure X Window System is not installed (Scored)
+        run_test 2.2.3 1 test_2.2.x avahi avahi-daemon.service "5353" Avahi Server   ## 2.2.4 Ensure Avahi Server is not enabled (Scored)
+        run_test 2.2.4 1 test_2.2.x cups cups.service "631" CUPS   ## 2.2.4 Ensure CUPS is not enabled (Scored)
+        run_test 2.2.5 1 test_2.2.x dhcp dhcpd.service "67" DHCP   ## 2.2.5 Ensure DHCP server is not enabled (Scored)
+        run_test 2.2.6 1 test_2.2.x openldap-servers slapd.service "583|:636" LDAP   ## 2.2.6 Ensure LDAP server is not enabled (Scored)
+        run_test 2.2.7 1 test_2.2.7   ## 2.2.7 Ensure NFS and RPC are not enabled (Scored)
+        run_test 2.2.8 1 test_2.2.x bind named.service "53" DNS   ## 2.2.8 Ensure LDAP server is not enabled (Scored)
+        run_test 2.2.9 1 test_2.2.x vsftpd vsftpd.service "21" FTP   ## 2.2.9 Ensure FTP server is not enabled (Scored)
+        run_test 2.2.10 1 test_2.2.x httpd httpd.service "80|:443" HTTP   ## 2.2.10 Ensure HTTP server is not enabled (Scored)
+        run_test 2.2.11 1 test_2.2.x dovecot dovecot.service "110|:143|:587|:993|:995" IMAP and POP   ## 2.2.11 Ensure IMAP and POP server is not enabled (Scored)
+        run_test 2.2.12 1 test_2.2.x samba smb.service "445" Samba   ## 2.2.12 Ensure Samba server is not enabled (Scored)
+        run_test 2.2.13 1 test_2.2.x squid squid.service "3128|:80|:443" HTTP Proxy   ## 2.2.13 Ensure HTTP Proxy Server is not enabled (Scored)
+        run_test 2.2.14 1 test_2.2.x net-snmp snmpd.service "161" SNMP   ## 2.2.14 Ensure SNMP Server is not enabled (Scored)
+        run_test 2.2.15 1 test_2.2.15   ## Ensure mail transfer agent is configured for local-only mode (Scored)
+        run_test 2.2.16 1 test_2.2.x ypserv ypserv.service "789" NIS   ## Ensure NIS Server is not enabled (Scored)
+        run_test 2.2.17 1 test_2.2.17   ## Ensure rsh server is not enabled (Scored)
+        run_test 2.2.18 1 test_2.2.x telnet-server telnet.socket "23" telnet   ## Ensure telnet server is not enabled (Scored)
+        run_test 2.2.19 1 test_2.2.x tftp-server tftp.socket "69" tfp   ## Ensure tftp server is not enabled (Scored)
+        run_test 2.2.20 1 test_2.2.x rsync rsyncd.service "873" rsync   ## Ensure rsync service is not enabled (Scored)
+        run_test 2.2.21 1 test_2.2.x talk-server ntalk.service "517" talk   ## Ensure talk server is not enabled (Scored)
     fi
     if [ $(is_test_included 2.3; echo $?) -eq 0 ]; then   write_cache "2.3,Service Clients"
-        run_test 2.3.1 test_2.3.x ypbind NIS   ### 2.3.1 Ensure NIS Client is not installed (Scored)
-        run_test 2.3.2 test_2.3.x rsh rsh   ### 2.3.2 Ensure rsh client is not installed (Scored)
-        run_test 2.3.3 test_2.3.x talk talk   ## 2.3.3 Ensure talk client is not installed (Scored)
-        run_test 2.3.4 test_2.3.x telnet telnet   ## 2.3.4 Ensure telnet client is not installed (Scored)
-        run_test 2.3.5 test_2.3.x openldap-clients LDAP   ## 2.3.5 Ensure LDAP client is not installed (Scored)
+        run_test 2.3.1 1 test_2.3.x ypbind NIS   ### 2.3.1 Ensure NIS Client is not installed (Scored)
+        run_test 2.3.2 1 test_2.3.x rsh rsh   ### 2.3.2 Ensure rsh client is not installed (Scored)
+        run_test 2.3.3 1 test_2.3.x talk talk   ## 2.3.3 Ensure talk client is not installed (Scored)
+        run_test 2.3.4 1 test_2.3.x telnet telnet   ## 2.3.4 Ensure telnet client is not installed (Scored)
+        run_test 2.3.5 1 test_2.3.x openldap-clients LDAP   ## 2.3.5 Ensure LDAP client is not installed (Scored)
     fi
 fi
 
 ## Section 3 - Network Configuration 
 if [ $(is_test_included 3; echo $?) -eq 0 ]; then   write_cache "3,Network Configuration"
     if [ $(is_test_included 3.1; echo $?) -eq 0 ]; then   write_cache "3.1,Network Parameters (Host Only)"
-        run_test 3.1.1 test_3.x-single ipv4 ip_forward 0 "Ensure IP forwarding is disabled"   ## 3.1.1 Ensure IP forwarding is disabled (Scored)
-        run_test 3.1.2 test_3.x-double ipv4 send_redirects 0 "Ensure packet redirect sending is not allowed"   ## 3.1.2 Ensure packet redirect sending is disabled (Scored)
+        run_test 3.1.1 1 test_3.x-single ipv4 ip_forward 0 "Ensure IP forwarding is disabled"   ## 3.1.1 Ensure IP forwarding is disabled (Scored)
+        run_test 3.1.2 1 test_3.x-double ipv4 send_redirects 0 "Ensure packet redirect sending is not allowed"   ## 3.1.2 Ensure packet redirect sending is disabled (Scored)
     fi
     if [ $(is_test_included 3.2; echo $?) -eq 0 ]; then   write_cache "3.2,Network Parameters (Host and Router)"
-        run_test 3.2.1 test_3.x-double ipv4 accept_source_route 0 "Ensure source routed packets are not accepted"   ## 3.2.1 Ensure source routed packets are not accepted (Scored)
-        run_test 3.2.2 test_3.x-double ipv4 accept_redirects 0 "Ensure ICMP redirects are not accepted"   ## 3.2.2 Ensure ICMP redirects are not accepted (Scored)
-        run_test 3.2.3 test_3.x-double ipv4 secure_redirects 0 "Ensure secure ICMP redirects are not accepted"   ## 3.2.3 Ensure secure ICMP redirects are not accepted (Scored)
-        run_test 3.2.4 test_3.x-double ipv4 log_martians 1 "Ensure suspicious packages are logged"   ## 3.2.4 Ensure suspicious packets are logged (Scored)
-        run_test 3.2.5 test_3.x-single ipv4 icmp_echo_ignore_broadcasts 1 "Ensure broadcast ICMP requests are ignored"   ## 3.2.5 Ensure broadcast ICMP requests are ignored (Scored)
-        run_test 3.2.6 test_3.x-single ipv4 icmp_ignore_bogus_error_responses 1 "Ensure bogus ICMP responses are ignored"   ## 3.2.6 Ensure bogus ICMP responses are ignored (Scored)
-        run_test 3.2.7 test_3.x-double ipv4 rp_filter 1 "Ensure Reverse Path Filtering is enabled"   ## 3.2.7 Ensure Reverse Path Filtering is enabled (Scored)
-        run_test 3.2.8 test_3.x-single ipv4 tcp_syncookies 1 "Ensure TCP SYN Cookies are enabled"   ## 3.2.8 Ensure TCP SYN Cookies are enabled (Scored)
+        run_test 3.2.1 1 test_3.x-double ipv4 accept_source_route 0 "Ensure source routed packets are not accepted"   ## 3.2.1 Ensure source routed packets are not accepted (Scored)
+        run_test 3.2.2 1 test_3.x-double ipv4 accept_redirects 0 "Ensure ICMP redirects are not accepted"   ## 3.2.2 Ensure ICMP redirects are not accepted (Scored)
+        run_test 3.2.3 1 test_3.x-double ipv4 secure_redirects 0 "Ensure secure ICMP redirects are not accepted"   ## 3.2.3 Ensure secure ICMP redirects are not accepted (Scored)
+        run_test 3.2.4 1 test_3.x-double ipv4 log_martians 1 "Ensure suspicious packages are logged"   ## 3.2.4 Ensure suspicious packets are logged (Scored)
+        run_test 3.2.5 1 test_3.x-single ipv4 icmp_echo_ignore_broadcasts 1 "Ensure broadcast ICMP requests are ignored"   ## 3.2.5 Ensure broadcast ICMP requests are ignored (Scored)
+        run_test 3.2.6 1 test_3.x-single ipv4 icmp_ignore_bogus_error_responses 1 "Ensure bogus ICMP responses are ignored"   ## 3.2.6 Ensure bogus ICMP responses are ignored (Scored)
+        run_test 3.2.7 1 test_3.x-double ipv4 rp_filter 1 "Ensure Reverse Path Filtering is enabled"   ## 3.2.7 Ensure Reverse Path Filtering is enabled (Scored)
+        run_test 3.2.8 1 test_3.x-single ipv4 tcp_syncookies 1 "Ensure TCP SYN Cookies are enabled"   ## 3.2.8 Ensure TCP SYN Cookies are enabled (Scored)
     fi
     if [ $(is_test_included 3.3; echo $?) -eq 0 ]; then   write_cache "3.3,IPv6"
-        run_test 3.3.1 test_3.x-double ipv6 accept_ra 0 "Ensure IPv6 router advertisements are not accepted"   ## 3.3.1 Ensure IPv6 router advertisements are not accepted (Scored)
-        run_test 3.3.2 test_3.x-double ipv6 accept_redirects 0 "Ensure IPv6 redirects are not accepted"   ## 3.3.2 Ensure IPv6 redirects are not accepted (Scored)
-        run_test 3.3.3 test_3.3.3   ### Ensure IPv6 is disabled (Not Scored)
+        run_test 3.3.1 1 test_3.x-double ipv6 accept_ra 0 "Ensure IPv6 router advertisements are not accepted"   ## 3.3.1 Ensure IPv6 router advertisements are not accepted (Scored)
+        run_test 3.3.2 1 test_3.x-double ipv6 accept_redirects 0 "Ensure IPv6 redirects are not accepted"   ## 3.3.2 Ensure IPv6 redirects are not accepted (Scored)
+        run_test 3.3.3 1 test_3.3.3   ### Ensure IPv6 is disabled (Not Scored)
     fi
     if [ $(is_test_included 3.4; echo $?) -eq 0 ]; then   write_cache "3.4,TCP Wrappers"
-        run_test 3.4.1 test_3.4.1   ## 3.4.1 Ensure TCP Wrappers is installed (Scored)
-        run_test 3.4.2 test_3.4.2   ## 3.4.2 Ensure /etc/hosts.allow is configured (Scored)
-        run_test 3.4.3 test_3.4.3   ## 3.4.3 Ensure /etc/hosts.deny is configured (Scored)
-        run_test 3.4.4 test_3.4.x /etc/hosts.allow   ## 3.4.4 Ensure permissions on /etc/hosts.allow is configured (Scored)
-        run_test 3.4.5 test_3.4.x /etc/hosts.deny   ## 3.4.5 Ensure permissions on /etc/hosts.deny are 644 (Scored)
+        run_test 3.4.1 1 test_3.4.1   ## 3.4.1 Ensure TCP Wrappers is installed (Scored)
+        run_test 3.4.2 1 test_3.4.2   ## 3.4.2 Ensure /etc/hosts.allow is configured (Scored)
+        run_test 3.4.3 1 test_3.4.3   ## 3.4.3 Ensure /etc/hosts.deny is configured (Scored)
+        run_test 3.4.4 1 test_3.4.x /etc/hosts.allow   ## 3.4.4 Ensure permissions on /etc/hosts.allow is configured (Scored)
+        run_test 3.4.5 1 test_3.4.x /etc/hosts.deny   ## 3.4.5 Ensure permissions on /etc/hosts.deny are 644 (Scored)
     fi
     if [ $(is_test_included 3.5; echo $?) -eq 0 ]; then   write_cache "3.5,Uncommon Network Protocols"
-        run_test 3.5.1 test_3.5.x dccp DCCP   ### 3.5.1 Ensure DCCP is disabled (Not Scored)
-        run_test 3.5.2 test_3.5.x sctp SCTP   ### 3.5.2 Ensure SCTP is disabled (Not Scored)
-        run_test 3.5.3 test_3.5.x rds RDS   ### 3.5.3 Ensure RDS is disabled (Not Scored)
-        run_test 3.5.4 test_3.5.x tipc TIPC   ### 3.5.4 Ensure DCCP is disabled (Not Scored)
+        run_test 3.5.1 1 test_3.5.x dccp DCCP   ### 3.5.1 Ensure DCCP is disabled (Not Scored)
+        run_test 3.5.2 1 test_3.5.x sctp SCTP   ### 3.5.2 Ensure SCTP is disabled (Not Scored)
+        run_test 3.5.3 1 test_3.5.x rds RDS   ### 3.5.3 Ensure RDS is disabled (Not Scored)
+        run_test 3.5.4 1 test_3.5.x tipc TIPC   ### 3.5.4 Ensure DCCP is disabled (Not Scored)
     fi
     if [ $(is_test_included 3.6; echo $?) -eq 0 ]; then   write_cache "3.6,Firewall Configuration"
-        run_test 3.6.1 test_is_installed iptables IPTables   ## 3.6.1 Ensure iptables is installed (Scored)
-        run_test 3.6.2 test_3.6.2   ## 3.6.2 Ensure default deny firewall policy (Scored)
-        run_test 3.6.3 test_3.6.3   ## 3.6.3 Ensure loopback traffic is configured (Scored)
-        run_test 3.6.4 test_3.6.4   ## 3.6.4 Ensure outbound and established connections are configured (Not Scored)
-        run_test 3.6.5 skip_test "Ensure firewall rules exist for all open ports"   ## 3.6.5 Ensure firewall rules exist for all open ports (Scored)
+        run_test 3.6.1 1 test_is_installed iptables IPTables   ## 3.6.1 Ensure iptables is installed (Scored)
+        run_test 3.6.2 1 test_3.6.2   ## 3.6.2 Ensure default deny firewall policy (Scored)
+        run_test 3.6.3 1 test_3.6.3   ## 3.6.3 Ensure loopback traffic is configured (Scored)
+        run_test 3.6.4 1 test_3.6.4   ## 3.6.4 Ensure outbound and established connections are configured (Not Scored)
+        run_test 3.6.5 1 skip_test "Ensure firewall rules exist for all open ports"   ## 3.6.5 Ensure firewall rules exist for all open ports (Scored)
     fi
     ## This test deviates from the benchmark's audit steps. The assumption here is that if you are on a server
     ## then you shouldn't have the wireless-tools installed for you to even use wireless interfaces
-    run_test 3.7 test_is_installed wireless-tools "wireless interfaces"   ## 3.7 Ensure wireless interfacs are disabled (Not Scored)
+    run_test 3.7 1 test_is_installed wireless-tools "wireless interfaces"   ## 3.7 Ensure wireless interfacs are disabled (Not Scored)
 fi
 
 ## Section 4 - Logging and Auditing
 if [ $(is_test_included 4; echo $?) -eq 0 ]; then   write_cache "4,Logging and Auditing"
     if [ $(is_test_included 4.1; echo $?) -eq 0 ]; then   write_cache "4.1,Configure System Accounting"
         if [ $(is_test_included 4.1.1; echo $?) -eq 0 ]; then   write_cache "4.1.1,Configure Data Retention"
-            run_test 4.1.1.1 test_4.1.1.1   ## 4.1.1.1 Ensure audtit log storage size is configured (Not Scored)
-            run_test 4.1.1.2 test_4.1.1.2   ## 4.1.1.2 Ensure system is disabled when audit logs are full (Scored)
-            run_test 4.1.1.3 test_4.1.1.3   ## 4.1.1.3 Ensure audit logs are not automatically deleted (Scored)
+            run_test 4.1.1.1 2 test_4.1.1.1   ## 4.1.1.1 Ensure audtit log storage size is configured (Not Scored)
+            run_test 4.1.1.2 2 test_4.1.1.2   ## 4.1.1.2 Ensure system is disabled when audit logs are full (Scored)
+            run_test 4.1.1.3 2 test_4.1.1.3   ## 4.1.1.3 Ensure audit logs are not automatically deleted (Scored)
         fi
-        run_test 4.1.2 test_is_enabled auditd.service auditd   ## 4.1.2 Ensue auditd service is enabled (Scored)
-        run_test 4.1.3 test_4.1.3   ## 4.1.3 Ensure auditing for processes that start prior to auditd is enabled (Scored)
-        run_test 4.1.4 test_4.1.4   ## 4.1.4 Ensure events that modify date and time information are collected (Scored)
-        run_test 4.1.5 test_4.1.5   ## 4.1.5 Ensure events that modify user/group information are collected (Scored)
-        run_test 4.1.6 test_4.1.6   ## 4.1.6 Ensure events that modify the system's network environment are collected (Scored)
-        run_test 4.1.7 test_4.1.7   ## 4.1.7 Ensure events that modify the system's Mandatory Access Controls are collected (Scored)
-        run_test 4.1.8 test_4.1.8   ## 4.1.8 Ensure login and logout events are collected (Scored)
-        run_test 4.1.9 test_4.1.9   ## 4.1.9 Ensure session initiation information is collected (Scored)
-        run_test 4.1.10 test_4.1.10   ## 4.1.10 Ensure discretionary access control permission modification events are collected (Scored)
-        run_test 4.1.11 test_4.1.11   ## 4.1.11 Ensure unsuccessful unauthorized file access attempts are collected (Scored)
-        run_test 4.1.12 skip_test "Ensure use of privileged commands is collected"   ## 4.1.12 Ensure use of privileged commands is collected (Scored)
-        run_test 4.1.13 test_4.1.13   ## 4.1.13 Ensure successful file system mounts are collected (Scored)
-        run_test 4.1.14 test_4.1.14   ## 4.1.14 Ensure file deletion events by users are collected (Scored)
-        run_test 4.1.15 test_4.1.15   ## 4.1.15 Ensure changes to system administration scope (sudoers) is collected (Scored)
-        run_test 4.1.16 test_4.1.16   ## 4.1.16 Ensure system administrator actions (sudolog) are collecteed (Scored)
-        run_test 4.1.17 test_4.1.17   ## 4.1.17 Ensure kernel module loading and unloading is collected (Scored)
-        run_test 4.1.18 test_4.1.18   ## 4.1.18 Ensure the audit configuration is immutable (Scored)
+        run_test 4.1.2 2 test_is_enabled auditd.service auditd   ## 4.1.2 Ensue auditd service is enabled (Scored)
+        run_test 4.1.3 2 test_4.1.3   ## 4.1.3 Ensure auditing for processes that start prior to auditd is enabled (Scored)
+        run_test 4.1.4 2 test_4.1.4   ## 4.1.4 Ensure events that modify date and time information are collected (Scored)
+        run_test 4.1.5 2 test_4.1.5   ## 4.1.5 Ensure events that modify user/group information are collected (Scored)
+        run_test 4.1.6 2 test_4.1.6   ## 4.1.6 Ensure events that modify the system's network environment are collected (Scored)
+        run_test 4.1.7 2 test_4.1.7   ## 4.1.7 Ensure events that modify the system's Mandatory Access Controls are collected (Scored)
+        run_test 4.1.8 2 test_4.1.8   ## 4.1.8 Ensure login and logout events are collected (Scored)
+        run_test 4.1.9 2 test_4.1.9   ## 4.1.9 Ensure session initiation information is collected (Scored)
+        run_test 4.1.10 2 test_4.1.10   ## 4.1.10 Ensure discretionary access control permission modification events are collected (Scored)
+        run_test 4.1.11 2 test_4.1.11   ## 4.1.11 Ensure unsuccessful unauthorized file access attempts are collected (Scored)
+        run_test 4.1.12 1 skip_test "Ensure use of privileged commands is collected"   ## 4.1.12 Ensure use of privileged commands is collected (Scored)
+        run_test 4.1.13 2 test_4.1.13   ## 4.1.13 Ensure successful file system mounts are collected (Scored)
+        run_test 4.1.14 2 test_4.1.14   ## 4.1.14 Ensure file deletion events by users are collected (Scored)
+        run_test 4.1.15 2 test_4.1.15   ## 4.1.15 Ensure changes to system administration scope (sudoers) is collected (Scored)
+        run_test 4.1.16 2 test_4.1.16   ## 4.1.16 Ensure system administrator actions (sudolog) are collecteed (Scored)
+        run_test 4.1.17 2 test_4.1.17   ## 4.1.17 Ensure kernel module loading and unloading is collected (Scored)
+        run_test 4.1.18 2 test_4.1.18   ## 4.1.18 Ensure the audit configuration is immutable (Scored)
         
     fi
     if [ $(is_test_included 4.2; echo $?) -eq 0 ]; then   write_cache "4.2,Configure Logging"
         if [ $(is_test_included 4.2.1; echo $?) -eq 0 ]; then
             if [ $(rpm -q rsyslog &>/dev/null; echo $?) -eq 0 ]; then   write_cache "4.2.1,Configure rsyslog"
-                run_test 4.2.1.1 test_is_enabled rsyslog.service rsyslog   ## 4.2.1.1 Ensure rsyslog service is enabled (Scored)
-                run_test 4.2.1.2 skip_test "Ensure logging is configured"   ## 4.2.1.2 Ensure logging is configured (Scored)
-                run_test 4.2.1.3 test_4.2.1.3   ## 4.2.1.3 Ensure rsyslog default file permissions configured (Scored)
-                run_test 4.2.1.4 test_4.2.1.4   ## 4.2.1.4 Ensure rsyslog is configured to send logs to a remote log host (Scored)
-                run_test 4.2.1.5 skip_test "Ensure remote rsyslog messages are only accepted on designated log hosts"   ## 4.2.1.5 Ensure remote rsyslog messages are only accepted on designated log hosts (Not Scored)
+                run_test 4.2.1.1 1 test_is_enabled rsyslog.service rsyslog   ## 4.2.1.1 Ensure rsyslog service is enabled (Scored)
+                run_test 4.2.1.2 1 skip_test "Ensure logging is configured"   ## 4.2.1.2 Ensure logging is configured (Scored)
+                run_test 4.2.1.3 1 test_4.2.1.3   ## 4.2.1.3 Ensure rsyslog default file permissions configured (Scored)
+                run_test 4.2.1.4 1 test_4.2.1.4   ## 4.2.1.4 Ensure rsyslog is configured to send logs to a remote log host (Scored)
+                run_test 4.2.1.5 1 skip_test "Ensure remote rsyslog messages are only accepted on designated log hosts"   ## 4.2.1.5 Ensure remote rsyslog messages are only accepted on designated log hosts (Not Scored)
             else
                 write_cache "4.2.1,Configure rsyslog,Skipped"
             fi
         fi
         if [ $(is_test_included 4.2.2; echo $?) -eq 0 ]; then
             if [ $(rpm -q syslog-ng &>/dev/null; echo $?) -eq 0 ]; then   write_cache "4.2.2,Configure syslog-ng"
-                run_test 4.2.1.1 test_is_enabled syslog-ng.service syslog-ng   ## 4.2.2.1 Ensure syslog-ng service is enabled (Scored)
-                run_test 4.2.2.2 skip_test "Ensure logging is configured"   ## 4.2.2.2 Ensure logging is configured (Scored)
-                run_test 4.2.2.3 test_4.2.2.3   ## 4.2.1.3 Ensure syslog-ng default file permissions configured (Scored)
-                run_test 4.2.2.4 test_4.2.2.4   ## 4.2.2.4 Ensure syslog-ng is configured to send logs to a remote log host (Scored)
-                run_test 4.2.2.5 skip_test "Ensure remote syslog-ng messages are only accepted on designated log hosts"   ## 4.2.1.5 Ensure remote rsyslog messages are only accepted on designated log hosts (Not Scored)
+                run_test 4.2.1.1 1 test_is_enabled syslog-ng.service syslog-ng   ## 4.2.2.1 Ensure syslog-ng service is enabled (Scored)
+                run_test 4.2.2.2 1 skip_test "Ensure logging is configured"   ## 4.2.2.2 Ensure logging is configured (Scored)
+                run_test 4.2.2.3 1 test_4.2.2.3   ## 4.2.1.3 Ensure syslog-ng default file permissions configured (Scored)
+                run_test 4.2.2.4 1 test_4.2.2.4   ## 4.2.2.4 Ensure syslog-ng is configured to send logs to a remote log host (Scored)
+                run_test 4.2.2.5 1 skip_test "Ensure remote syslog-ng messages are only accepted on designated log hosts"   ## 4.2.1.5 Ensure remote rsyslog messages are only accepted on designated log hosts (Not Scored)
             else
                 write_cache "4.2.2,Configure syslog-ng,Skipped"
             fi
         fi
-        run_test 4.2.3 test_4.2.3   ## 4.2.3 Ensure rsyslog or syslog-ng is installed (Scored)
-        run_test 4.2.4 test_4.2.4   ## 4.2.4 Ensure permissions on all logfiles are configured (Scored)
+        run_test 4.2.3 1 test_4.2.3   ## 4.2.3 Ensure rsyslog or syslog-ng is installed (Scored)
+        run_test 4.2.4 1 test_4.2.4   ## 4.2.4 Ensure permissions on all logfiles are configured (Scored)
     fi
-    run_test 4.3 skip_test "Ensure logrotate is configured"   ## 4.3 Ensure logrotate is configured (Not Scored)
+    run_test 4.3 1 skip_test "Ensure logrotate is configured"   ## 4.3 Ensure logrotate is configured (Not Scored)
 fi
 
 ## Section 5 - Access, Authentication and Authorization
 if [ $(is_test_included 5; echo $?) -eq 0 ]; then   write_cache "5,Access Authentication and Authorization"
     if [ $(is_test_included 5.1; echo $?) -eq 0 ]; then   write_cache "5.1,Configure cron"
-        run_test 5.1.1 test_is_enabled crond "cron daemon"   ## 5.1.1 Ensure cron daemon is enabled (Scored)
-        run_test 5.1.2 test_perms 600 /etc/crontab   ## 5.1.2 Ensure permissions on /etc/crontab are configured (Scored)
-        run_test 5.1.3 test_perms 700 /etc/cron.hourly   ## 5.1.2 Ensure permissions on /etc/cron.hourly are configured (Scored)
-        run_test 5.1.4 test_perms 700 /etc/cron.daily   ## 5.1.2 Ensure permissions on /etc/cron.daily are configured (Scored)
-        run_test 5.1.5 test_perms 700 /etc/cron.weekly   ## 5.1.2 Ensure permissions on /etc/cron.weekly are configured (Scored)
-        run_test 5.1.6 test_perms 700 /etc/cron.monthly   ## 5.1.2 Ensure permissions on /etc/cron.monthly are configured (Scored)
-        run_test 5.1.7 test_perms 700 /etc/cron.d   ## 5.1.2 Ensure permissions on /etc/cron.d are configured (Scored)
-        run_test 5.1.8 test_5.1.8   ## Ensure at/cron is restri9cted to authorized users (Scored)
+        run_test 5.1.1 1 test_is_enabled crond "cron daemon"   ## 5.1.1 Ensure cron daemon is enabled (Scored)
+        run_test 5.1.2 1 test_perms 600 /etc/crontab   ## 5.1.2 Ensure permissions on /etc/crontab are configured (Scored)
+        run_test 5.1.3 1 test_perms 700 /etc/cron.hourly   ## 5.1.2 Ensure permissions on /etc/cron.hourly are configured (Scored)
+        run_test 5.1.4 1 test_perms 700 /etc/cron.daily   ## 5.1.2 Ensure permissions on /etc/cron.daily are configured (Scored)
+        run_test 5.1.5 1 test_perms 700 /etc/cron.weekly   ## 5.1.2 Ensure permissions on /etc/cron.weekly are configured (Scored)
+        run_test 5.1.6 1 test_perms 700 /etc/cron.monthly   ## 5.1.2 Ensure permissions on /etc/cron.monthly are configured (Scored)
+        run_test 5.1.7 1 test_perms 700 /etc/cron.d   ## 5.1.2 Ensure permissions on /etc/cron.d are configured (Scored)
+        run_test 5.1.8 1 test_5.1.8   ## Ensure at/cron is restri9cted to authorized users (Scored)
     fi
     if [ $(is_test_included 5.2; echo $?) -eq 0 ]; then   write_cache "5.2,SSH Server Configuration"
-        run_test 5.2.1 test_perms 600 /etc/ssh/sshd_config   ## 5.2.1 Ensure permissions on /etc/ssh/sshd_config are configured (Scored)
-        run_test 5.2.2 test_5.2.2   ## 5.2.2 Ensure SSH Protocol is set to 2 (Scored)
-        run_test 5.2.3 test_5.2.3   ## 5.2.3 Ensure SSH LogLevel is set to INFO (Scored)
-        run_test 5.2.4 test_5.2.4   ## 5.2.4 Ensure SSH X11 forwarding is disabled (Scored)
-        run_test 5.2.5 test_5.2.5   ## 5.2.5 Ensure MaxAuthTries is set to 4 or less (Scored)
-        run_test 5.2.6 test_5.2.6   ## 5.2.6 Ensure SSH IgnoreRhosts is enabled (Scored)
-        run_test 5.2.7 test_5.2.7   ## 5.2.7 Ensure SSH HostbasedAUthentication is disabled (Scored)
-        run_test 5.2.8 test_5.2.8   ## 5.2.8 Ensure root login is disabled (Scored)
-        run_test 5.2.9 test_5.2.9   ## 5.2.9 Ensure PermitEmptyPasswords is disabled (Scored)
-        run_test 5.2.10 test_5.2.10   ## 5.2.10 Ensure PermitUserEnvironment is disabled (Scored)
-        run_test 5.2.11 test_5.2.11   ## 5.2.11 Ensure only approved ciphers are used (Scored)
-        run_test 5.2.12 test_5.2.12   ## 5.2.12 Ensure only approved MAC algorithms are used (Scored)
-        run_test 5.2.13 test_5.2.13   ## 5.2.13 Ensure SSH Idle Timeout Interval is configured (Scored)
-        run_test 5.2.14 test_5.2.14   ## 5.2.14 Ensure SSH LoginGraceTime is set to one minute or less (Scored)
-        run_test 5.2.15 skip_test "Ensure SSH access is limited"   ## 5.2.15 Ensure (Scored)
-        run_test 5.2.16 test_5.2.16   ## 5.2.16 Ensure SSH warning banner is configured (Scored)
+        run_test 5.2.1 1 test_perms 600 /etc/ssh/sshd_config   ## 5.2.1 Ensure permissions on /etc/ssh/sshd_config are configured (Scored)
+        run_test 5.2.2 1 test_5.2.2   ## 5.2.2 Ensure SSH Protocol is set to 2 (Scored)
+        run_test 5.2.3 1 test_5.2.3   ## 5.2.3 Ensure SSH LogLevel is set to INFO (Scored)
+        run_test 5.2.4 1 test_5.2.4   ## 5.2.4 Ensure SSH X11 forwarding is disabled (Scored)
+        run_test 5.2.5 1 test_5.2.5   ## 5.2.5 Ensure MaxAuthTries is set to 4 or less (Scored)
+        run_test 5.2.6 1 test_5.2.6   ## 5.2.6 Ensure SSH IgnoreRhosts is enabled (Scored)
+        run_test 5.2.7 1 test_5.2.7   ## 5.2.7 Ensure SSH HostbasedAUthentication is disabled (Scored)
+        run_test 5.2.8 1 test_5.2.8   ## 5.2.8 Ensure root login is disabled (Scored)
+        run_test 5.2.9 1 test_5.2.9   ## 5.2.9 Ensure PermitEmptyPasswords is disabled (Scored)
+        run_test 5.2.10 1 test_5.2.10   ## 5.2.10 Ensure PermitUserEnvironment is disabled (Scored)
+        run_test 5.2.11 1 test_5.2.11   ## 5.2.11 Ensure only approved ciphers are used (Scored)
+        run_test 5.2.12 1 test_5.2.12   ## 5.2.12 Ensure only approved MAC algorithms are used (Scored)
+        run_test 5.2.13 1 test_5.2.13   ## 5.2.13 Ensure SSH Idle Timeout Interval is configured (Scored)
+        run_test 5.2.14 1 test_5.2.14   ## 5.2.14 Ensure SSH LoginGraceTime is set to one minute or less (Scored)
+        run_test 5.2.15 1 skip_test "Ensure SSH access is limited"   ## 5.2.15 Ensure (Scored)
+        run_test 5.2.16 1 test_5.2.16   ## 5.2.16 Ensure SSH warning banner is configured (Scored)
     fi
     if [ $(is_test_included 5.3; echo $?) -eq 0 ]; then   write_cache "5.3,Configure PAM"
-        run_test 5.3.1 test_5.3.1   ## 5.3.1 Ensure password creation requirements are configured (Scored)
-        run_test 5.3.2 skip_test "Ensure lockout for failed password attempts is configured"   ## 5.3.2 Ensure lockout for failed password attempts is configured (Scored)
-        run_test 5.3.3 test_5.3.3   ## 5.3.3 Ensure password reuse is limited (Scored)
-        run_test 5.3.4 test_5.3.4   ## 5.3.4 Ensure password hashing algorithm is SHA-512 (Scored)
+        run_test 5.3.1 1 test_5.3.1   ## 5.3.1 Ensure password creation requirements are configured (Scored)
+        run_test 5.3.2 1 skip_test "Ensure lockout for failed password attempts is configured"   ## 5.3.2 Ensure lockout for failed password attempts is configured (Scored)
+        run_test 5.3.3 1 test_5.3.3   ## 5.3.3 Ensure password reuse is limited (Scored)
+        run_test 5.3.4 1 test_5.3.4   ## 5.3.4 Ensure password hashing algorithm is SHA-512 (Scored)
     fi
     if [ $(is_test_included 5.4; echo $?) -eq 0 ]; then   write_cache "5.4,User Accounts and Environment"
         if [ $(is_test_included 5.4.1; echo $?) -eq 0 ]; then   write_cache "5.4.1,Set Shadow Password Suite Passwords"
-            run_test 5.4.1.1 test_5.4.1.1   ## 5.4.1.1 Ensure password expiration is 90 days or less (Scored)
-            run_test 5.4.1.2 test_5.4.1.2   ## 5.4.1.2 Ensure minimum days between password changes is 7 or more (Scored)
-            run_test 5.4.1.3 test_5.4.1.3   ## 5.4.1.3 Ensure password expiration warning days is 7 or more (Scored)
-            run_test 5.4.1.4 test_5.4.1.4   ## 5.4.1.4 Ensure inactive password lock is 30 days or less (Scored)
+            run_test 5.4.1.1 1 test_5.4.1.1   ## 5.4.1.1 Ensure password expiration is 90 days or less (Scored)
+            run_test 5.4.1.2 1 test_5.4.1.2   ## 5.4.1.2 Ensure minimum days between password changes is 7 or more (Scored)
+            run_test 5.4.1.3 1 test_5.4.1.3   ## 5.4.1.3 Ensure password expiration warning days is 7 or more (Scored)
+            run_test 5.4.1.4 1 test_5.4.1.4   ## 5.4.1.4 Ensure inactive password lock is 30 days or less (Scored)
         fi
-        run_test 5.4.2 test_5.4.2   ## 5.4.2 Ensure system accounts are non-login (Scored)
-        run_test 5.4.3 test_5.4.3   ## 5.4.2 Ensure default group for the root account is GID 0 (Scored)
-        run_test 5.4.4 test_5.4.4   ## 5.4.3 Ensure default user umask is 027 or more restrictive (Scored)
+        run_test 5.4.2 1 test_5.4.2   ## 5.4.2 Ensure system accounts are non-login (Scored)
+        run_test 5.4.3 1 test_5.4.3   ## 5.4.2 Ensure default group for the root account is GID 0 (Scored)
+        run_test 5.4.4 1 test_5.4.4   ## 5.4.3 Ensure default user umask is 027 or more restrictive (Scored)
     fi
-    run_test 5.5 skip_test "Ensure root login is restricted to system console"   ## 5.5 Ensure root login is restricted to system console (Not Scored)
-    run_test 5.6 test_5.6   ## 5.6 Ensure access to the su command is restricted (Scored)
+    run_test 5.5 1 skip_test "Ensure root login is restricted to system console"   ## 5.5 Ensure root login is restricted to system console (Not Scored)
+    run_test 5.6 1 test_5.6   ## 5.6 Ensure access to the su command is restricted (Scored)
 fi
 
 ## Section 6 - System Maintenance 
 if [ $(is_test_included 6; echo $?) -eq 0 ]; then   write_cache "6,System Maintenance"
     if [ $(is_test_included 6.1; echo $?) -eq 0 ]; then   write_cache "6.1,System File Permissions"
-        run_test 6.1.1 test_6.1.1   ## 6.1.1 Audit system file permissions (Not Scored)
-        run_test 6.1.2 test_perms 644 /etc/passwd   ## 6.1.2 Ensure permissions on /etc/passwd are configured (Scored)
-        run_test 6.1.3 test_perms 000 /etc/shadow   ## 6.1.3 Ensure permissions on /etc/shadow are configured (Scored)
-        run_test 6.1.4 test_perms 644 /etc/group   ## 6.1.4 Ensure permissions on /etc/group are configured (Scored)
-        run_test 6.1.5 test_perms 600 /etc/gshadow   ## 6.1.5 Ensure permissions on /etc/gshadow are configured (Scored)
-        run_test 6.1.6 test_perms 600 /etc/passwd-   ## 6.1.6 Ensure permissions on /etc/passwd- are configured (Scored)
-        run_test 6.1.7 test_perms 600 /etc/shadow-   ## 6.1.7 Ensure permissions on /etc/shadow- are configured (Scored)
-        run_test 6.1.8 test_perms 600 /etc/group-   ## 6.1.8 Ensure permissions on /etc/group- are configured (Scored)
-        run_test 6.1.9 test_perms 600 /etc/gshadow-   ## 6.1.9 Ensure permissions on /etc/gshadow- are configured (Scored)
-        run_test 6.1.10 test_6.1.10   ## Ensure no world-writable files exist (Scored)
-        run_test 6.1.11 test_6.1.11   ## Ensure no unowned files or directories exist (Scored)
-        run_test 6.1.12 test_6.1.12   ## Ensure no ungrouped files or directories exist (Scored)
-        run_test 6.1.13 skip_test "Audit SUID executables"   ## 6.1.13 Audit SUID executables (Not Scored)
-        run_test 6.1.14 skip_test "Audit SGID executables"   ## 6.1.14 Audit SGID executables (Not Scored)
+        run_test 6.1.1 1 test_6.1.1   ## 6.1.1 Audit system file permissions (Not Scored)
+        run_test 6.1.2 1 test_perms 644 /etc/passwd   ## 6.1.2 Ensure permissions on /etc/passwd are configured (Scored)
+        run_test 6.1.3 1 test_perms 000 /etc/shadow   ## 6.1.3 Ensure permissions on /etc/shadow are configured (Scored)
+        run_test 6.1.4 1 test_perms 644 /etc/group   ## 6.1.4 Ensure permissions on /etc/group are configured (Scored)
+        run_test 6.1.5 1 test_perms 600 /etc/gshadow   ## 6.1.5 Ensure permissions on /etc/gshadow are configured (Scored)
+        run_test 6.1.6 1 test_perms 600 /etc/passwd-   ## 6.1.6 Ensure permissions on /etc/passwd- are configured (Scored)
+        run_test 6.1.7 1 test_perms 600 /etc/shadow-   ## 6.1.7 Ensure permissions on /etc/shadow- are configured (Scored)
+        run_test 6.1.8 1 test_perms 600 /etc/group-   ## 6.1.8 Ensure permissions on /etc/group- are configured (Scored)
+        run_test 6.1.9 1 test_perms 600 /etc/gshadow-   ## 6.1.9 Ensure permissions on /etc/gshadow- are configured (Scored)
+        run_test 6.1.10 1 test_6.1.10   ## Ensure no world-writable files exist (Scored)
+        run_test 6.1.11 1 test_6.1.11   ## Ensure no unowned files or directories exist (Scored)
+        run_test 6.1.12 1 test_6.1.12   ## Ensure no ungrouped files or directories exist (Scored)
+        run_test 6.1.13 1 skip_test "Audit SUID executables"   ## 6.1.13 Audit SUID executables (Not Scored)
+        run_test 6.1.14 1 skip_test "Audit SGID executables"   ## 6.1.14 Audit SGID executables (Not Scored)
     fi
     if [ $(is_test_included 6.2; echo $?) -eq 0 ]; then   write_cache "6.2,User and Group Settings"
-        run_test 6.2.1 test_6.2.1   ## 6.2.1 Ensure password fields are not empty (Scored)
-        run_test 6.2.2 test_6.2.x-legacy_entries /etc/passwd   ## 6.2.2 Ensure no legacy "+" entries exist in /etc/passwd (Scored)
-        run_test 6.2.3 test_6.2.x-legacy_entries /etc/shadow   ## 6.2.3 Ensure no legacy "+" entries exist in /etc/shadow (Scored)
-        run_test 6.2.4 test_6.2.x-legacy_entries /etc/group   ## 6.2.4 Ensure no legacy "+" entries exist in /etc/group (Scored)
-        run_test 6.2.5 test_6.2.5   ## 6.2.5 Ensure root is the only GID 0 account (Scored)
-        run_test 6.2.6 test_6.2.6   ## 6.2.6 Ensure root PATH integrity (Scored)
-        run_test 6.2.7 test_6.2.7   ## 6.2.7 Ensure all users' home directories exist (Scored)
-        run_test 6.2.8 test_6.2.8   ## 6.2.8 Ensure users' home directories permissions are 750 or more restrictive (Scored)
-        run_test 6.2.9 test_6.2.9   ## 6.2.9 Ensure users own their own home directories (Scored)
-        run_test 6.2.10 test_6.2.10   ## 6.2.10 Ensure users' dot files are not group or world writiable (Scored)
-        run_test 6.2.11 test_6.2.11   ## 6.2.11 Ensure no users have .forward files (Scored)
-        run_test 6.2.12 test_6.2.12   ## 6.2.12 Ensure no users have .netrc files (Scored)
-        run_test 6.2.13 test_6.2.13   ## 6.2.13 Ensure users' .netrc files are not group or world accessible
-        run_test 6.2.14 test_6.2.14   ## 6.2.14 Ensure no users have .rhosts files (Scored)
-        run_test 6.2.15 test_6.2.15   ## 6.2.15 Ensure all groups in /etc/passwd exist in /etc/group (Scored)
-        run_test 6.2.16 test_6.2.16   ## 6.2.16 Ensure no duplicate UIDs exist (Scored)
-        run_test 6.2.17 test_6.2.17   ## 6.2.17 Ensure no duplicate GIDs exist (Scored)
-        run_test 6.2.18 test_6.2.18   ## 6.2.18 Ensure no duplicate user names exist (Scored)
-        run_test 6.2.19 test_6.2.19   ## 6.2.19 Ensure no duplicate group names exist (Scored) 
+        run_test 6.2.1 1 test_6.2.1   ## 6.2.1 Ensure password fields are not empty (Scored)
+        run_test 6.2.2 1 test_6.2.x-legacy_entries /etc/passwd   ## 6.2.2 Ensure no legacy "+" entries exist in /etc/passwd (Scored)
+        run_test 6.2.3 1 test_6.2.x-legacy_entries /etc/shadow   ## 6.2.3 Ensure no legacy "+" entries exist in /etc/shadow (Scored)
+        run_test 6.2.4 1 test_6.2.x-legacy_entries /etc/group   ## 6.2.4 Ensure no legacy "+" entries exist in /etc/group (Scored)
+        run_test 6.2.5 1 test_6.2.5   ## 6.2.5 Ensure root is the only GID 0 account (Scored)
+        run_test 6.2.6 1 test_6.2.6   ## 6.2.6 Ensure root PATH integrity (Scored)
+        run_test 6.2.7 1 test_6.2.7   ## 6.2.7 Ensure all users' home directories exist (Scored)
+        run_test 6.2.8 1 test_6.2.8   ## 6.2.8 Ensure users' home directories permissions are 750 or more restrictive (Scored)
+        run_test 6.2.9 1 test_6.2.9   ## 6.2.9 Ensure users own their own home directories (Scored)
+        run_test 6.2.10 1 test_6.2.10   ## 6.2.10 Ensure users' dot files are not group or world writiable (Scored)
+        run_test 6.2.11 1 test_6.2.11   ## 6.2.11 Ensure no users have .forward files (Scored)
+        run_test 6.2.12 1 test_6.2.12   ## 6.2.12 Ensure no users have .netrc files (Scored)
+        run_test 6.2.13 1 test_6.2.13   ## 6.2.13 Ensure users' .netrc files are not group or world accessible
+        run_test 6.2.14 1 test_6.2.14   ## 6.2.14 Ensure no users have .rhosts files (Scored)
+        run_test 6.2.15 1 test_6.2.15   ## 6.2.15 Ensure all groups in /etc/passwd exist in /etc/group (Scored)
+        run_test 6.2.16 1 test_6.2.16   ## 6.2.16 Ensure no duplicate UIDs exist (Scored)
+        run_test 6.2.17 1 test_6.2.17   ## 6.2.17 Ensure no duplicate GIDs exist (Scored)
+        run_test 6.2.18 1 test_6.2.18   ## 6.2.18 Ensure no duplicate user names exist (Scored)
+        run_test 6.2.19 1 test_6.2.19   ## 6.2.19 Ensure no duplicate group names exist (Scored) 
     fi
 fi
 
