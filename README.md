@@ -18,21 +18,29 @@ No changes are made to system files by this script.
   Options:
     -h,  --help                  Prints this help text
          --debug                 Run script with debug output turned on
+         --level (1,2)           Run tests for the specified level only
          --include "<test_ids>"  Space delimited list of tests to include
          --exclude "<test_ids>"  Space delimited list of tests to exclude
          --nice                  Lowers the CPU priority of executing tests
-         --no-colour             Disable colouring for STDOUT (Output redirected to a file/pipe is never coloured anyway)
+         --no-colour             Disable colouring for STDOUT (Note that output redirected to a file/pipe is never coloured)
 
   Examples:
   
     Run with debug enabled:
-      audit.sh --debug
+      cis-audit.sh --debug
       
     Exclude tests from section 1.1 and 1.3.2:
-      audit.sh --exclude "1.1 1.32"
-
+      cis-audit.sh --exclude "1.1 1.3.2"
+      
     Include tests only from section 4.1 but exclude tests from section 4.1.1:
-      audit.sh --include 4.1 --exclude 4.1.1
+      cis-audit.sh --include 4.1 --exclude 4.1.1
+    
+    Run only level 1 tests
+      cis-audit.sh --level 1
+    
+    Run level 1 tests and include some but not all SELinux questions
+      cis-audit.sh --level 1 --include 1.6 --exclude 1.6.1.2
+
 ```
 
 #### Disclaimer:

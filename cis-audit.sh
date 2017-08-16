@@ -107,7 +107,7 @@ EOF
     cat << EOF | column -t -s'|'
 ||-h,|--help|Prints this help text
 |||--debug|Run script with debug output turned on
-|||--level (1|2) |Run tests from specified level only
+|||--level (1,2)|Run tests for the specified level only
 |||--include "<test_ids>"|Space delimited list of tests to include
 |||--exclude "<test_ids>"|Space delimited list of tests to exclude
 |||--nice|Lowers the CPU priority of executing tests
@@ -128,11 +128,11 @@ EOF
     Include tests only from section 4.1 but exclude tests from section 4.1.1:
       $me --include 4.1 --exclude 4.1.1
     
-    Run only level 2 tests
-      $me --level 2
+    Run only level 1 tests
+      $me --level 1
     
-    Run level 2 tests and some section 6 tests, but not section 6.1 tests
-      $me --level 2 --include 6 --exclude 6.1
+    Run level 1 tests and include some but not all SELinux questions
+      $me --level 1 --include 1.6 --exclude 1.6.1.2
 
 EOF
 
