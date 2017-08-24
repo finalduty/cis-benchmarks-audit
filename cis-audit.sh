@@ -111,9 +111,10 @@ EOF
 |||--level (1,2)|Run tests for the specified level only
 |||--include "<test_ids>"|Space delimited list of tests to include
 |||--exclude "<test_ids>"|Space delimited list of tests to exclude
-|||--nice [default]|Lowers the CPU priority of executing tests
-|||--no-nice|Do not lower CPU priority of executing tests. Setting this option overrides the --nice option
-|||--no-colour|Disable colouring for STDOUT (Note that output redirected to a file/pipe is never coloured)
+|||--nice |Lower the CPU priority for test execution. This is the default behaviour.
+|||--no-nice|Do not lower CPU priority for test execution. This may make the tests complete faster but at 
+||||the cost of putting a higher load on the server. Setting this overrides the --nice option.
+|||--no-colour|Disable colouring for STDOUT. Output redirected to a file/pipe is never coloured.
 
 EOF
 
@@ -173,9 +174,10 @@ outputter() {
     tests_ran=$(( $tests_total - $tests_skipped ))
     tests_passed=$(egrep -c ",Pass," $tmp_file)
     tests_failed=$(egrep -c ",Fail," $tmp_file)
+    tests_duration=$(( $( date +%s ) - $start_time ))
     
     echo
-    echo "Passed $tests_passed of $tests_ran tests ($tests_skipped Skipped)"
+    echo "Passed $tests_passed of $tests_ran tests in $tests_duration seconds ($tests_skipped Skipped)"
     echo
     
     write_debug "All results written to STDOUT"
@@ -1164,7 +1166,7 @@ test_3.x-single() {
     protocol=$3
     sysctl=$4
     val=$5
-    description=$( echo $@ | awk '{$1=$2=$3=$4=""; print $0}' | sed 's/^ *//')
+    description=$( echo $@ | awk '{$1=$2=$3=$4=$5=""; print $0}' | sed 's/^ *//')
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1181,7 +1183,7 @@ test_3.x-double() {
     protocol=$3
     sysctl=$4
     val=$5
-    description=$( echo $@ | awk '{$1=$2=$3=$4=""; print $0}' | sed 's/^ *//')
+    description=$( echo $@ | awk '{$1=$2=$3=$4=$5=""; print $0}' | sed 's/^ *//')
     scored="Scored"
     test_start_time="$(test_start $id)"
     
@@ -1283,7 +1285,7 @@ test_3.5.x() {
     level=$2
     protocol=$3
     name=$4
-    description="Ensure mounting of $name is disabled"
+    description="Ensure $name is disabled"
     scored="Scored"
     test_start_time=$(test_start $id)
     
@@ -2029,8 +2031,8 @@ test_5.3.1() {
     ## Tests Start ##
     file="/etc/security/pwquality.conf"
     
-    [ $(grep -c "^password requisite pam_pwquality.so try_first_pass retry=3" /etc/pam.d/password-auth) -eq 1 ] || state=1
-    [ $(grep -c "^password requisite pam_pwquality.so try_first_pass retry=3" /etc/pam.d/system-auth) -eq 1 ] || state=1
+    [ $(grep -c "^password requisite pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/password-auth) -eq 1 ] || state=1
+    [ $(grep -c "^password requisite pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/system-auth) -eq 1 ] || state=1
     
     if [ "$(grep -c "^minlen=" $file)" -eq 1 ]; then
         [ "$(grep "^minlen=" $file | sed 's/^.*=//' )" -ge 14 ] || state=1
