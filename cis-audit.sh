@@ -1,7 +1,8 @@
 #!/bin/bash
-## andy.dustin@gmail.com [rev: a44ceb7]
+## andy.dustin@gmail.com [rev: ad63750: Improved progress ticker display logic ]
+## andy.dustin@gmail.com [rev: a44ceb7: First Release]
 
-## This script checks for compliance against CIS CentOS Linux 7 Benchmark v2.1.1 01-31-2017 measures
+## This script checks for compliance against CIS CentOS Linux 7 Benchmark v2.1.1 2017-01-31 measures
 ## Each individual standard has it's own function and is forked to the background, allowing for 
 ## multiple tests to be run in parallel, reducing execution time.
 
@@ -31,7 +32,7 @@ tmp_file_base="/tmp/.cis_audit"
 tmp_file="$tmp_file_base-$(date +%y%m%d%H%M%S).output"
 started_counter="$tmp_file_base-$(date +%y%m%d%H%M%S).started.counter"
 finished_counter="$tmp_file_base-$(date +%y%m%d%H%M%S).finished.counter"
-wait_time="0.3"
+wait_time="0.25"
 progress_update_delay="0.1"
 max_running_tests=10
 debug=False
@@ -244,7 +245,7 @@ progress() {
     
     array=(\| \/ \- \\)
     
-    while [ $(running_children) -gt 1 ]; do 
+    while [ "$(running_children)" -gt 1 -o "$(cat $tmp_file_base-stage)" == "LOADING" ]; do 
         started=$( wc -l $started_counter | awk '{print $1}' )
         finished=$( wc -l $finished_counter | awk '{print $1}' )
         running=$(( $started - $finished ))
@@ -255,6 +256,10 @@ progress() {
         
         script_duration="$(date +%T -ud @$(( $(date +%s) - $start_time )))"
         printf "\r[$script_duration] ($char) $finished of $started tests completed " >&2
+        
+        #ps --ppid $$ >> ~/tmp/cis-audit
+        #running_children >> ~/tmp/cis-audit
+        #echo Stage: $test_stage >> ~/tmp/cis-audit
         
         sleep $progress_update_delay
     done
@@ -333,6 +338,9 @@ test_finish() {
     
     echo $duration
 } ## Prints debug output (when enabled) and returns duration since $start_time
+test_stage() {
+    echo $test_stage
+} ## Shim to get up to date $test_stage value
 tidy_up() {
     [ $debug == "True" ] && opt="-v"
     rm $opt "$tmp_file_base"* &>2
@@ -2671,6 +2679,7 @@ test_6.2.19() {
 parse_args $@
 
 ## Run setup function
+echo "LOADING" > $tmp_file_base-stage
 setup
 progress & 
 
@@ -3020,7 +3029,9 @@ fi
 
 
 ## Wait while all tests exit
+echo "RUNNING" > $tmp_file_base-stage
 wait
+echo "FINISHED" > $tmp_file_base-stage
 write_debug "All tests have completed"
 
 ## Output test results
