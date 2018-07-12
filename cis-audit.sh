@@ -1341,7 +1341,7 @@ test_3.6.3() {
         
         ## This check differs slightly from that specified in the standard. 
         ## I personally believe it's safer to specify that the rule is not on the loopback interface
-        [ $(echo "$str" | egrep --color=always -- "-A INPUT -s 127\.0\.0\.0\/8(\s! -i lo)? -j DROP") != 0 ] || state=$(( $state + 4 ))
+        [ $(echo "$str" | egrep -c -- "-A INPUT -s 127\.0\.0\.0\/8(\s! -i lo)? -j DROP") != 0 ] || state=$(( $state + 4 ))
         
         [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
