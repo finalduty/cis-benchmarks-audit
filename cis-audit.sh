@@ -173,7 +173,7 @@ outputter() {
         ) | column -t -s , | sed -e '/^[0-9]\ / s/^/\n/'
     fi
     
-    tests_total=$(egrep -c "Scored|Skipped" $tmp_file)
+    tests_total=$(grep -c "Scored" $tmp_file)
     tests_skipped=$(grep -c ",Skipped," $tmp_file)
     tests_ran=$(( $tests_total - $tests_skipped ))
     tests_passed=$(egrep -c ",Pass," $tmp_file)
@@ -181,7 +181,7 @@ outputter() {
     tests_duration=$(( $( date +%s ) - $start_time ))
     
     echo
-    echo "Passed $tests_passed of $tests_ran tests in $tests_duration seconds ($tests_skipped Skipped)"
+    echo "Passed $tests_passed of $tests_total tests in $tests_duration seconds ($tests_skipped Skipped)"
     echo
     
     write_debug "All results written to STDOUT"
