@@ -1,11 +1,4 @@
 #!/bin/bash
-## andy.dustin@gmail.com [rev: ad80cd7]: Updated state tracking on some tests incorrectly failing
-## andy.dustin@gmail.com [rev: ad63750: Improved progress ticker display logic ]
-## andy.dustin@gmail.com [rev: a44ceb7: First Release]
-
-## This script checks for compliance against CIS CentOS Linux 7 Benchmark v2.1.1 2017-01-31 measures
-## Each individual standard has it's own function and is forked to the background, allowing for 
-## multiple tests to be run in parallel, reducing execution time.
 
 ##
 ## Copyright 2017 Andy Dustin
@@ -19,6 +12,15 @@
 ## distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 ## See the License for the specific language governing permissions and limitations under the License.
 ##
+
+## andy.dustin@gmail.com [rev: ad80cd7]: Updated state tracking on some tests incorrectly failing
+## andy.dustin@gmail.com [rev: ad63750: Improved progress ticker display logic ]
+## andy.dustin@gmail.com [rev: a44ceb7: First Release]
+
+## This script checks for compliance against CIS CentOS Linux 7 Benchmark v2.1.1 2017-01-31 measures
+## Each individual standard has it's own function and is forked to the background, allowing for 
+## multiple tests to be run in parallel, reducing execution time.
+
 
 
 ### Variables ###
@@ -278,6 +280,10 @@ run_test() {
     args=$(echo $@ | awk '{$1 = $2 = $3 = ""; print $0}' | sed 's/^ *//')
     
     if [ $(is_test_included $id $level; echo $?) -eq 0 ]; then
+        if [ $renice_bool = "True" -a $renice_value -gt 0 -a $renice_value -le 19 ]; then
+            test="nice -n$renice_value $test"
+        fi
+        
         write_debug "Requesting test $id by calling \"$test $id $args &\""
         
         while [ "$(pgrep -P $$ 2>/dev/null | wc -l)" -ge $max_running_tests ]; do 
@@ -306,12 +312,6 @@ running_children() {
 } ## Ghetto implementation that returns how many child processes are running
 setup() {
     write_debug "Script was started with PID: $$"
-    if [ $renice_bool = "True" ]; then
-        if [ $renice_value -gt 0 -a $renice_value -le 19 ]; then
-            renice_output="$(renice +$renice_value $$)"
-            write_debug "Renicing $renice_output"
-        fi
-    fi
     
     write_debug "Creating tmp files with base $tmp_file_base*"
     cat /dev/null > $tmp_file
@@ -1341,7 +1341,7 @@ test_3.6.3() {
         
         ## This check differs slightly from that specified in the standard. 
         ## I personally believe it's safer to specify that the rule is not on the loopback interface
-        [ $(echo "$str" | egrep -c -- "-A INPUT -s 127\.0\.0\.0\/8 ?(?:\s! -i lo)? -j DROP") != 0 ] || state=$(( $state + 4 ))
+        [ $(echo "$str" | egrep --color=always -- "-A INPUT -s 127\.0\.0\.0\/8(\s! -i lo)? -j DROP") != 0 ] || state=$(( $state + 4 ))
         
         [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
