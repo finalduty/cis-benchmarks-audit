@@ -1,4 +1,5 @@
 #!/bin/bash
+## andy.dustin@gmail.com [rev: ad80cd7]: Updated state tracking on some tests incorrectly failing
 ## andy.dustin@gmail.com [rev: ad63750: Improved progress ticker display logic ]
 ## andy.dustin@gmail.com [rev: a44ceb7: First Release]
 
@@ -1028,14 +1029,15 @@ test_2.2.1.3() {
     description="Ensure chrony is configured"
     scored="Scored"
     test_start_time="$(test_start $id)"
+    state=0
     
     ## Tests Start ##
     if [ $( rpm -q chrony &>/dev/null; echo $? ) -eq 0 ]; then
-        grep "^server .*$" /etc/chrony.conf &>/dev/null || state=1
+        grep "^server .*$" /etc/chrony.conf &>/dev/null || state=$(( $state + 1 ))
         if [ -f /etc/sysconfig/chronyd ]; then
-            [ $( grep -c 'OPTIONS="-u chrony' /etc/sysconfig/chronyd ) -eq 0 ] && state=2
+            [ $( grep -c 'OPTIONS="-u chrony' /etc/sysconfig/chronyd ) -eq 0 ] && state=$(( $state + 2 ))
         else
-            state=4
+            state=$(( $state + 4 ))
         fi
         
         [ $state -eq 0 ] && result="Pass"
@@ -1330,15 +1332,16 @@ test_3.6.3() {
     description="Ensure loopback traffic is configured"
     scored="Scored"
     test_start_time=$(test_start $id)
+    state=0
     
     ## Tests Start ##
         str=$(iptables -S -w60)
-        [ $(echo "$str" | grep -c -- "-A INPUT -i lo -j ACCEPT") != 0 ] || state=1
-        [ $(echo "$str" | grep -c -- "-A OUTPUT -o lo -j ACCEPT") != 0 ] || state=2
+        [ $(echo "$str" | grep -c -- "-A INPUT -i lo -j ACCEPT") != 0 ] || state=$(( $state + 1 ))
+        [ $(echo "$str" | grep -c -- "-A OUTPUT -o lo -j ACCEPT") != 0 ] || state=$(( $state + 2 ))
         
         ## This check differs slightly from that specified in the standard. 
         ## I personally believe it's safer to specify that the rule is not on the loopback interface
-        [ $(echo "$str" | egrep -c -- "-A INPUT -s 127\.0\.0\.0\/8 ?(?:\s! -i lo)? -j DROP") != 0 ] || state=4
+        [ $(echo "$str" | egrep -c -- "-A INPUT -s 127\.0\.0\.0\/8 ?(?:\s! -i lo)? -j DROP") != 0 ] || state=$(( $state + 4 ))
         
         [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
@@ -1985,7 +1988,7 @@ test_5.2.13() {
     
     ## Tests Start ##
     if [ $(grep -c "^ClientAlive" /etc/ssh/sshd_config) -eq 2 ]; then
-        [ $(grep "^ClientAliveInterval" /etc/ssh/sshd_config | awk '{print $2}') -le 300 ] || state=1
+        [ $(grep "^ClientAliveInterval" /etc/ssh/sshd_config | awk '{print $2}') -le 900 ] || state=1
         [ $(grep "^ClientAliveCountMax" /etc/ssh/sshd_config | awk '{print $2}') -eq 0 ] || state=1
     else
         state=1
@@ -2135,18 +2138,19 @@ test_5.4.1.2() {
     description="Ensure minimum days between password changes is 7 or more"
     scored="Scored"
     test_start_time="$(test_start $id)"
+    state=0
     
     ## Tests Start ##
     file="/etc/login.defs"
     days=7
     if [ -s $file ]; then
         if [ $(grep -c "^PASS_MAX_DAYS" $file) -eq 1 ]; then
-            [ $(awk '/^PASS_MAX_DAYS/ {print $2}' $file) -ge $days ] || state=1
+            [ $(awk '/^PASS_MAX_DAYS/ {print $2}' $file) -ge $days ] || state=$(( $state + 1))
         fi
     fi
     
     for i in $(egrep ^[^:]+:[^\!*] /etc/shadow | cut -d: -f1); do 
-        [ $(chage --list $i 2>/dev/null | awk '/Minimum/ {print $9}') -ge $days ] || state=1
+        [ $(chage --list $i 2>/dev/null | awk '/Minimum/ {print $9}') -ge $days ] || state=$(( $state + 2 ))
     done
     
     [ $state -eq 0 ] && result="Pass"
@@ -2444,15 +2448,16 @@ test_6.2.8() {
     description="Ensure users' home directories permissions are 750 or more restrictive"
     scored="Scored"
     test_start_time="$(test_start $id)"
+    state=0
     
     ## Tests Start ##
     for dir in $(egrep -v '(halt|sync|shutdown|/sbin/nologin)' /etc/passwd | awk -F: '{print $6}'); do
         perms=$(ls -ld $dir | cut -f1 -d" ")
 
-        [ $(echo $perms | cut -c6) == "-" ] || state=1
-        [ $(echo $perms | cut -c8) == "-" ] || state=1
-        [ $(echo $perms | cut -c9) == "-" ] || state=1
-        [ $(echo $perms | cut -c10) == "-" ] || state=1
+        [ $(echo $perms | cut -c6) == "-" ] || state=$(( $state + 1 ))
+        [ $(echo $perms | cut -c8) == "-" ] || state=$(( $state + 2 ))
+        [ $(echo $perms | cut -c9) == "-" ] || state=$(( $state + 4 ))
+        [ $(echo $perms | cut -c10) == "-" ] || state=$(( $state + 8 ))
     done
     
     [ $state -eq 0 ] && result="Pass"
