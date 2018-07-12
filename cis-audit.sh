@@ -2041,28 +2041,30 @@ test_5.3.1() {
     description="Ensure password creation requirements are configured"
     scored="Scored"
     test_start_time="$(test_start $id)"
+    state=0
     
     ## Tests Start ##
     file="/etc/security/pwquality.conf"
     
-    [ $(grep -c "^password requisite pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/password-auth) -eq 1 ] || state=1
-    [ $(grep -c "^password requisite pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/system-auth) -eq 1 ] || state=1
+    [ $(grep -c "^password requisite pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/password-auth) -eq 1 ] || state=$(( $state + 1 ))
+    [ $(grep -c "^password requisite pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/system-auth) -eq 1 ] || state=$(( $state + 2 ))
     
     if [ "$(grep -c "^minlen=" $file)" -eq 1 ]; then
-        [ "$(grep "^minlen=" $file | sed 's/^.*=//' )" -ge 14 ] || state=1
+        [ "$(grep "^minlen=" $file | sed 's/^.*=//' )" -ge 14 ] || state=$(( $state + 4 ))
     else
-        state=1
+        state=$(( $state + 8 ))
     fi
     
     for i in dcredit ucredit ocredit lcredit; do
         if [ "$(grep -c "^$i=" $file)" -eq 1 ]; then
-            [ "$(grep "^$i=" $file | sed 's/^.*=-//' )" -ge 1 ] || state=1
+            [ "$(grep "^$i=" $file | sed 's/^.*=-//' )" -ge 1 ] || state=$(( $state + 16 ))
         else
-            state=1
+            state=$(( $state + 32 ))
         fi
     done
 
     [ $state -eq 0 ]&& result="Pass"
+    write_debug "Test $id finished with end state of $state"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -2250,10 +2252,11 @@ test_5.4.4() {
     description="Ensure default user umask is 027 or more restrictive"
     scored="Scored"
     test_start_time="$(test_start $id)"
+    state=0
     
     ## Tests Start ##
-    [ $(grep -c "^umask 027" /etc/bashrc) -eq 1 ] || state=1
-    [ $(grep -c "^umask 027" /etc/profile) -eq 1 ] || state=1
+    [ $(grep -c "umask 027" /etc/bashrc) -eq 1 ] || state=$(( $state + 1 ))
+    [ $(grep -c "umask 027" /etc/profile) -eq 1 ] || state=$(( $state + 2 ))
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
