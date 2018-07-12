@@ -280,10 +280,6 @@ run_test() {
     args=$(echo $@ | awk '{$1 = $2 = $3 = ""; print $0}' | sed 's/^ *//')
     
     if [ $(is_test_included $id $level; echo $?) -eq 0 ]; then
-        if [ $renice_bool = "True" -a $renice_value -gt 0 -a $renice_value -le 19 ]; then
-            test="nice -n$renice_value $test"
-        fi
-        
         write_debug "Requesting test $id by calling \"$test $id $args &\""
         
         while [ "$(pgrep -P $$ 2>/dev/null | wc -l)" -ge $max_running_tests ]; do 
@@ -312,6 +308,12 @@ running_children() {
 } ## Ghetto implementation that returns how many child processes are running
 setup() {
     write_debug "Script was started with PID: $$"
+    if [ $renice_bool = "True" ]; then
+        if [ $renice_value -gt 0 -a $renice_value -le 19 ]; then
+            renice_output="$(renice +$renice_value $$)"
+            write_debug "Renicing $renice_output"
+        fi
+    fi
     
     write_debug "Creating tmp files with base $tmp_file_base*"
     cat /dev/null > $tmp_file
@@ -1808,15 +1810,16 @@ test_5.1.8() {
     description="Ensure at/cron is restricted to authorised users"
     scored="Scored"
     test_start_time="$(test_start $id)"
+    state=0
     
     ## Tests Start ##
-    [ -f /etc/at.deny ] && state=1
-    [ -f /etc/cron.deny ] && state=1
+    [ -f /etc/at.deny ] && state=$(( $state + 1 ))
+    [ -f /etc/cron.deny ] && state=$(( $state + 2 ))
     if [ -f /etc/at.allow -a -f /etc/cron.allow ]; then
-        [ $(ls -l /etc/at.allow 2>/dev/null | awk '{ print $1" "$3" "$4 }' | grep -c -- "-rw-------. root root") -eq 1 ] || state=1
-        [ $(ls -l /etc/cron.allow 2>/dev/null | awk '{ print $1" "$3" "$4 }' | grep -c -- "-rw-------. root root") -eq 1 ] || state=1
+        [ $(ls -l /etc/at.allow 2>/dev/null | awk '{ print $1" "$3" "$4 }' | grep -c -- "-rw-------. root root") -eq 1 ] || state=$(( $state + 4 ))
+        [ $(ls -l /etc/cron.allow 2>/dev/null | awk '{ print $1" "$3" "$4 }' | grep -c -- "-rw-------. root root") -eq 1 ] || state=$(( $state + 8 ))
     else
-        state=1
+        state=$(( $state + 16 ))
     fi
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
