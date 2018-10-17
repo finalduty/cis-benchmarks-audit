@@ -13,9 +13,12 @@
 ## See the License for the specific language governing permissions and limitations under the License.
 ##
 
+## andy.dustin@gmail.com [rev: ae700e9]: Updated test 6.2.8 to use `stat` instead of `ls`
+## andy.dustin@gmail.com [rev: ae700df]: Fixed output for tests that are skipped using the 'skip_test' function
+## andy.dustin@gmail.com [rev: ae68d08]: User reported UX issue - Now includes both level 1 and level 2 tests when called with both '--level 1' and '--level 2' arguments. Thanks Darren Foster
 ## andy.dustin@gmail.com [rev: ad80cd7]: Updated state tracking on some tests incorrectly failing
-## andy.dustin@gmail.com [rev: ad63750: Improved progress ticker display logic ]
-## andy.dustin@gmail.com [rev: a44ceb7: First Release]
+## andy.dustin@gmail.com [rev: ad63750]: Improved progress ticker display logic 
+## andy.dustin@gmail.com [rev: a44ceb7]: First Release
 
 ## This script checks for compliance against CIS CentOS Linux 7 Benchmark v2.1.1 2017-01-31 measures
 ## Each individual standard has it's own function and is forked to the background, allowing for 
@@ -231,10 +234,12 @@ parse_args() {
     if [ $(echo $args | grep -- '--level 2' &>/dev/null; echo $?) -eq 0 ]; then
         test_level=$(( $test_level + 2 ))
         write_debug "Going to run Level 2 tests"
-    elif [ $(echo $args | grep -- '--level 1' &>/dev/null; echo $?) -eq 0 ]; then
+    fi
+    if [ $(echo $args | grep -- '--level 1' &>/dev/null; echo $?) -eq 0 ]; then
         test_level=$(( $test_level + 1 ))
         write_debug "Going to run Level 1 tests"
-    else
+    fi
+    if [ "$test_level" -eq 0 -o "$test_level" -eq 3 ]; then
         test_level=0
         write_debug "Going to run tests from any level"
     fi
@@ -374,7 +379,7 @@ skip_test() {
     
     id=$1
     level=$2
-    description=$( echo $@ | awk '{$1=""; print $0}' | sed 's/^ *//')
+    description=$( echo $@ | awk '{$1=$2=""; print $0}' | sed 's/^ *//')
     scored="Skipped"
     result=""
 
@@ -2457,13 +2462,13 @@ test_6.2.8() {
     state=0
     
     ## Tests Start ##
-    for dir in $(egrep -v '(halt|sync|shutdown|/sbin/nologin)' /etc/passwd | awk -F: '{print $6}'); do
-        perms=$(ls -ld $dir | cut -f1 -d" ")
+    for dir in $(egrep -v '(halt|sync|shutdown|/sbin/nologin|vboxadd)' /etc/passwd | awk -F: '{print $6}'); do
+        perms=$(stat $dir | awk 'NR==4 {print $2}' )
 
-        [ $(echo $perms | cut -c6) == "-" ] || state=$(( $state + 1 ))
-        [ $(echo $perms | cut -c8) == "-" ] || state=$(( $state + 2 ))
-        [ $(echo $perms | cut -c9) == "-" ] || state=$(( $state + 4 ))
-        [ $(echo $perms | cut -c10) == "-" ] || state=$(( $state + 8 ))
+        [ $(echo $perms | cut -c12) == "-" ] || state=$(( $state + 1 ))
+        [ $(echo $perms | cut -c14) == "-" ] || state=$(( $state + 2 ))
+        [ $(echo $perms | cut -c15) == "-" ] || state=$(( $state + 4 ))
+        [ $(echo $perms | cut -c16) == "-" ] || state=$(( $state + 8 ))
     done
     
     [ $state -eq 0 ] && result="Pass"
@@ -2883,7 +2888,7 @@ if [ $(is_test_included 3; echo $?) -eq 0 ]; then   write_cache "3,Network Confi
         run_test 3.6.2 1 test_3.6.2   ## 3.6.2 Ensure default deny firewall policy (Scored)
         run_test 3.6.3 1 test_3.6.3   ## 3.6.3 Ensure loopback traffic is configured (Scored)
         run_test 3.6.4 1 test_3.6.4   ## 3.6.4 Ensure outbound and established connections are configured (Not Scored)
-        run_test 3.6.5 skip_test "Ensure firewall rules exist for all open ports"   ## 3.6.5 Ensure firewall rules exist for all open ports (Scored)
+        run_test 3.6.5 1 skip_test "Ensure firewall rules exist for all open ports"   ## 3.6.5 Ensure firewall rules exist for all open ports (Scored)
     fi
     ## This test deviates from the benchmark's audit steps. The assumption here is that if you are on a server
     ## then you shouldn't have the wireless-tools installed for you to even use wireless interfaces
@@ -2908,7 +2913,7 @@ if [ $(is_test_included 4; echo $?) -eq 0 ]; then   write_cache "4,Logging and A
         run_test 4.1.9 2 test_4.1.9   ## 4.1.9 Ensure session initiation information is collected (Scored)
         run_test 4.1.10 2 test_4.1.10   ## 4.1.10 Ensure discretionary access control permission modification events are collected (Scored)
         run_test 4.1.11 2 test_4.1.11   ## 4.1.11 Ensure unsuccessful unauthorized file access attempts are collected (Scored)
-        run_test 4.1.12 skip_test "Ensure use of privileged commands is collected"   ## 4.1.12 Ensure use of privileged commands is collected (Scored)
+        run_test 4.1.12 2 skip_test "Ensure use of privileged commands is collected"   ## 4.1.12 Ensure use of privileged commands is collected (Scored)
         run_test 4.1.13 2 test_4.1.13   ## 4.1.13 Ensure successful file system mounts are collected (Scored)
         run_test 4.1.14 2 test_4.1.14   ## 4.1.14 Ensure file deletion events by users are collected (Scored)
         run_test 4.1.15 2 test_4.1.15   ## 4.1.15 Ensure changes to system administration scope (sudoers) is collected (Scored)
@@ -2921,10 +2926,10 @@ if [ $(is_test_included 4; echo $?) -eq 0 ]; then   write_cache "4,Logging and A
         if [ $(is_test_included 4.2.1; echo $?) -eq 0 ]; then
             if [ $(rpm -q rsyslog &>/dev/null; echo $?) -eq 0 ]; then   write_cache "4.2.1,Configure rsyslog"
                 run_test 4.2.1.1 1 test_is_enabled rsyslog.service rsyslog   ## 4.2.1.1 Ensure rsyslog service is enabled (Scored)
-                run_test 4.2.1.2 skip_test "Ensure logging is configured"   ## 4.2.1.2 Ensure logging is configured (Scored)
+                run_test 4.2.1.2 1 skip_test "Ensure logging is configured"   ## 4.2.1.2 Ensure logging is configured (Scored)
                 run_test 4.2.1.3 1 test_4.2.1.3   ## 4.2.1.3 Ensure rsyslog default file permissions configured (Scored)
                 run_test 4.2.1.4 1 test_4.2.1.4   ## 4.2.1.4 Ensure rsyslog is configured to send logs to a remote log host (Scored)
-                run_test 4.2.1.5 skip_test "Ensure remote rsyslog messages are only accepted on designated log hosts"   ## 4.2.1.5 Ensure remote rsyslog messages are only accepted on designated log hosts (Not Scored)
+                run_test 4.2.1.5 1 skip_test "Ensure remote rsyslog messages are only accepted on designated log hosts"   ## 4.2.1.5 Ensure remote rsyslog messages are only accepted on designated log hosts (Not Scored)
             else
                 write_cache "4.2.1,Configure rsyslog,Skipped"
             fi
@@ -2932,10 +2937,10 @@ if [ $(is_test_included 4; echo $?) -eq 0 ]; then   write_cache "4,Logging and A
         if [ $(is_test_included 4.2.2; echo $?) -eq 0 ]; then
             if [ $(rpm -q syslog-ng &>/dev/null; echo $?) -eq 0 ]; then   write_cache "4.2.2,Configure syslog-ng"
                 run_test 4.2.1.1 1 test_is_enabled syslog-ng.service syslog-ng   ## 4.2.2.1 Ensure syslog-ng service is enabled (Scored)
-                run_test 4.2.2.2 skip_test "Ensure logging is configured"   ## 4.2.2.2 Ensure logging is configured (Scored)
+                run_test 4.2.2.2 1 skip_test "Ensure logging is configured"   ## 4.2.2.2 Ensure logging is configured (Scored)
                 run_test 4.2.2.3 1 test_4.2.2.3   ## 4.2.1.3 Ensure syslog-ng default file permissions configured (Scored)
                 run_test 4.2.2.4 1 test_4.2.2.4   ## 4.2.2.4 Ensure syslog-ng is configured to send logs to a remote log host (Scored)
-                run_test 4.2.2.5 skip_test "Ensure remote syslog-ng messages are only accepted on designated log hosts"   ## 4.2.1.5 Ensure remote rsyslog messages are only accepted on designated log hosts (Not Scored)
+                run_test 4.2.2.5 1 skip_test "Ensure remote syslog-ng messages are only accepted on designated log hosts"   ## 4.2.1.5 Ensure remote rsyslog messages are only accepted on designated log hosts (Not Scored)
             else
                 write_cache "4.2.2,Configure syslog-ng,Skipped"
             fi
@@ -2943,7 +2948,7 @@ if [ $(is_test_included 4; echo $?) -eq 0 ]; then   write_cache "4,Logging and A
         run_test 4.2.3 1 test_4.2.3   ## 4.2.3 Ensure rsyslog or syslog-ng is installed (Scored)
         run_test 4.2.4 1 test_4.2.4   ## 4.2.4 Ensure permissions on all logfiles are configured (Scored)
     fi
-    run_test 4.3 skip_test "Ensure logrotate is configured"   ## 4.3 Ensure logrotate is configured (Not Scored)
+    run_test 4.3 1 skip_test "Ensure logrotate is configured"   ## 4.3 Ensure logrotate is configured (Not Scored)
 fi
 
 ## Section 5 - Access, Authentication and Authorization
@@ -2973,12 +2978,12 @@ if [ $(is_test_included 5; echo $?) -eq 0 ]; then   write_cache "5,Access Authen
         run_test 5.2.12 1 test_5.2.12   ## 5.2.12 Ensure only approved MAC algorithms are used (Scored)
         run_test 5.2.13 1 test_5.2.13   ## 5.2.13 Ensure SSH Idle Timeout Interval is configured (Scored)
         run_test 5.2.14 1 test_5.2.14   ## 5.2.14 Ensure SSH LoginGraceTime is set to one minute or less (Scored)
-        run_test 5.2.15 skip_test "Ensure SSH access is limited"   ## 5.2.15 Ensure (Scored)
+        run_test 5.2.15 1 skip_test "Ensure SSH access is limited"   ## 5.2.15 Ensure (Scored)
         run_test 5.2.16 1 test_5.2.16   ## 5.2.16 Ensure SSH warning banner is configured (Scored)
     fi
     if [ $(is_test_included 5.3; echo $?) -eq 0 ]; then   write_cache "5.3,Configure PAM"
         run_test 5.3.1 1 test_5.3.1   ## 5.3.1 Ensure password creation requirements are configured (Scored)
-        run_test 5.3.2 skip_test "Ensure lockout for failed password attempts is configured"   ## 5.3.2 Ensure lockout for failed password attempts is configured (Scored)
+        run_test 5.3.2 1 skip_test "Ensure lockout for failed password attempts is configured"   ## 5.3.2 Ensure lockout for failed password attempts is configured (Scored)
         run_test 5.3.3 1 test_5.3.3   ## 5.3.3 Ensure password reuse is limited (Scored)
         run_test 5.3.4 1 test_5.3.4   ## 5.3.4 Ensure password hashing algorithm is SHA-512 (Scored)
     fi
@@ -2993,7 +2998,7 @@ if [ $(is_test_included 5; echo $?) -eq 0 ]; then   write_cache "5,Access Authen
         run_test 5.4.3 1 test_5.4.3   ## 5.4.2 Ensure default group for the root account is GID 0 (Scored)
         run_test 5.4.4 1 test_5.4.4   ## 5.4.3 Ensure default user umask is 027 or more restrictive (Scored)
     fi
-    run_test 5.5 skip_test "Ensure root login is restricted to system console"   ## 5.5 Ensure root login is restricted to system console (Not Scored)
+    run_test 5.5 1 skip_test "Ensure root login is restricted to system console"   ## 5.5 Ensure root login is restricted to system console (Not Scored)
     run_test 5.6 1 test_5.6   ## 5.6 Ensure access to the su command is restricted (Scored)
 fi
 
@@ -3012,8 +3017,8 @@ if [ $(is_test_included 6; echo $?) -eq 0 ]; then   write_cache "6,System Mainte
         run_test 6.1.10 1 test_6.1.10   ## Ensure no world-writable files exist (Scored)
         run_test 6.1.11 1 test_6.1.11   ## Ensure no unowned files or directories exist (Scored)
         run_test 6.1.12 1 test_6.1.12   ## Ensure no ungrouped files or directories exist (Scored)
-        run_test 6.1.13 skip_test "Audit SUID executables"   ## 6.1.13 Audit SUID executables (Not Scored)
-        run_test 6.1.14 skip_test "Audit SGID executables"   ## 6.1.14 Audit SGID executables (Not Scored)
+        run_test 6.1.13 1 skip_test "Audit SUID executables"   ## 6.1.13 Audit SUID executables (Not Scored)
+        run_test 6.1.14 1 skip_test "Audit SGID executables"   ## 6.1.14 Audit SGID executables (Not Scored)
     fi
     if [ $(is_test_included 6.2; echo $?) -eq 0 ]; then   write_cache "6.2,User and Group Settings"
         run_test 6.2.1 1 test_6.2.1   ## 6.2.1 Ensure password fields are not empty (Scored)
