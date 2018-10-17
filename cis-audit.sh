@@ -13,12 +13,13 @@
 ## See the License for the specific language governing permissions and limitations under the License.
 ##
 
-## andy.dustin@gmail.com [rev: ae700e9]: Updated test 6.2.8 to use `stat` instead of `ls`
-## andy.dustin@gmail.com [rev: ae700df]: Fixed output for tests that are skipped using the 'skip_test' function
-## andy.dustin@gmail.com [rev: ae68d08]: User reported UX issue - Now includes both level 1 and level 2 tests when called with both '--level 1' and '--level 2' arguments. Thanks Darren Foster
-## andy.dustin@gmail.com [rev: ad80cd7]: Updated state tracking on some tests incorrectly failing
-## andy.dustin@gmail.com [rev: ad63750]: Improved progress ticker display logic 
 ## andy.dustin@gmail.com [rev: a44ceb7]: First Release
+## andy.dustin@gmail.com [rev: ad63750]: Improved progress ticker display logic 
+## andy.dustin@gmail.com [rev: ad80cd7]: Updated state tracking on some tests incorrectly failing
+## andy.dustin@gmail.com [rev: ae68d08]: User reported UX issue - Now includes both level 1 and level 2 tests when called with both '--level 1' and '--level 2' arguments. Thanks Darren Foster
+## andy.dustin@gmail.com [rev: ae700df]: Fixed output for tests that are skipped using the 'skip_test' function
+## andy.dustin@gmail.com [rev: ae700e9]: Updated test 6.2.8 to use `stat` instead of `ls`
+## andy.dustin@gmail.com [rev: ae70116]: Updated tests 5.2.11 and 5.2.12 to support a wider range of configurations of approved Ciphers and MACs in sshd_config. Also added error state for tests. Thanks Darren Foster
 
 ## This script checks for compliance against CIS CentOS Linux 7 Benchmark v2.1.1 2017-01-31 measures
 ## Each individual standard has it's own function and is forked to the background, allowing for 
@@ -181,10 +182,11 @@ outputter() {
     tests_ran=$(( $tests_total - $tests_skipped ))
     tests_passed=$(egrep -c ",Pass," $tmp_file)
     tests_failed=$(egrep -c ",Fail," $tmp_file)
+    tests_errored=$(egrep -c ",Error," $tmp_file)
     tests_duration=$(( $( date +%s ) - $start_time ))
     
     echo
-    echo "Passed $tests_passed of $tests_total tests in $tests_duration seconds ($tests_skipped Skipped)"
+    echo "Passed $tests_passed of $tests_total tests in $tests_duration seconds ($tests_skipped Skipped, $tests_errored Errors)"
     echo
     
     write_debug "All results written to STDOUT"
@@ -1966,8 +1968,29 @@ test_5.2.11() {
     scored="Scored"
     test_start_time="$(test_start $id)"
     
+    state=0
+    good_ciphers="aes256-ctr,aes192-ctr,aes128-ctr"
+    ciphers=$(awk '/^Ciphers / {print $2}' /etc/ssh/sshd_config | sed 's/,/ /g')
+    
     ## Tests Start ##
-    [ $(egrep -c "^Ciphers\saes256-ctr,aes192-ctr,aes128-ctr$" /etc/ssh/sshd_config) -eq 1 ] && result="Pass"
+    for cipher in $ciphers; do
+        if [ $( echo "$good_ciphers" | grep -c "$cipher") -eq 1 ]; then
+            [ "$state" -eq 0 ] && state=1
+            write_debug "5.2.11 - $cipher is an approved cipher"
+        else
+            state=2
+            write_debug "5.2.11 - $cipher is NOT an approved cipher ($good_ciphers)"
+        fi
+    done
+    
+    case $state in
+        1 ) result="Pass";;
+        2 ) result="Fail";;
+        * ) result="Error"
+            write_debug "5.2.11 - Something went wrong" ;;
+    esac
+            
+    #[ $(egrep -c "^Ciphers\saes256-ctr,aes192-ctr,aes128-ctr$" /etc/ssh/sshd_config) -eq 1 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1980,8 +2003,29 @@ test_5.2.12() {
     scored="Scored"
     test_start_time="$(test_start $id)"
     
+    state=0
+    good_macs="shmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,umac-128@openssh.com"
+    macs=$(awk '/^MACs / {print $2}' /etc/ssh/sshd_config | sed 's/,/ /g')
+
     ## Tests Start ##
-    [ $(egrep -c "^MACs\shmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,umac-128@openssh.com$" /etc/ssh/sshd_config) -eq 1 ] && result="Pass"
+    for mac in $macs; do
+        if [ $( echo "$good_macs" | grep -c "$mac") -eq 1 ]; then
+            [ "$state" -eq 0 ] && state=1
+            write_debug "5.2.11 - $mac is an approved MAC"
+        else
+            state=2
+            write_debug "5.2.11 - $mac is NOT an approved MAC ($good_macs)"
+        fi
+    done
+    
+    case $state in
+        1 ) result="Pass";;
+        2 ) result="Fail";;
+        * ) result="Error"
+            write_debug "5.2.11 - Something went wrong" ;;
+    esac
+
+    #[ $(egrep -c "^MACs\shmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,umac-128@openssh.com$" /etc/ssh/sshd_config) -eq 1 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
