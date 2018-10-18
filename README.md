@@ -43,9 +43,45 @@ No changes are made to system files by this script.
 
 ```
 
+### Example Results
+```
+# ./cis-audit.sh --include 5.2
+[00:00:01] (✓) 14 of 14 tests completed 
+
+ CIS CentOS 7 Benchmark v2.1.1 Results 
+---------------------------------------
+ID      Description                                                Scoring  Level  Result  Duration
+--      -----------                                                -------  -----  ------  --------
+
+5       Access Authentication and Authorization
+5.2     SSH Server Configuration
+5.2.1   Ensure permissions on /etc/ssh/sshd_config are configured  Scored   1      Pass    33ms
+5.2.2   Ensure SSH Protocol is set to 2                            Scored   1      Pass    5ms
+5.2.3   Ensure SSH LogLevel is set to INFO                         Scored   1      Pass    6ms
+5.2.4   Ensure SSH X11 forwarding is disabled                      Scored   1      Pass    4ms
+5.2.5   Ensure SSH MaxAuthTries is set to 4 or less                Scored   1      Pass    9ms
+5.2.6   Ensure SSH IgnoreRhosts is enabled                         Scored   1      Pass    5ms
+5.2.7   Ensure SSH HostbasedAuthentication is disabled             Scored   1      Pass    5ms
+5.2.8   Ensure SSH root login is disabled                          Scored   1      Fail    8ms
+5.2.9   Ensure SSH PermitEmptyPasswords is disabled                Scored   1      Pass    5ms
+5.2.10  Ensure SSH PermitUserEnvironment is disabled               Scored   1      Pass    8ms
+5.2.11  Ensure only approved ciphers are used                      Scored   1      Pass    16ms
+5.2.12  Ensure only approved MAC algorithms are used               Scored   1      Pass    45ms
+5.2.13  Ensure SSH Idle Timeout Interval is configured             Scored   1      Fail    15ms
+5.2.14  Ensure SSH LoginGraceTime is set to one minute or less     Scored   1      Pass    11ms
+5.2.15  Ensure SSH access is limited                               Skipped  1              
+5.2.16  Ensure SSH warning banner is configured                    Scored   1      Pass    6ms
+
+Passed 13 of 15 tests in 1 seconds (1 Skipped, 0 Errors)
+```
+
 #### Disclaimer:
-This is not a replacement for a full audit and a passing result from this script does not necessarily mean that you are compliant (but should give a good idea of where to start). The script will never make any changes to your system for you, but will write temporary state output to /tmp (which are cleaned up afterwards).
-This script can spawn multiple tests at a time and it possible that some tests could cause adverse effects on your system. There is an adjustable limit for processes as well as a nicing argument which can help keep load down.
-It is recommended that you **do not run this on a production server** at this time.
+This is not a replacement for a full audit and a passing result from this script does not necessarily mean that you are compliant (but it should give you a good idea of where to start).  
+
+The script will never make changes to your system, but it will write temporary data to to /tmp/.cis-audit* (which is cleaned up afterwards).  
+
+This script can run multiple tests at a time and it is possible that some tests could have an adverse impact on your system(s). There is an adjustable limit for the number of concurrent tests as well as a nicing argument which can help keep load down.  
+
+It is recommended that you **do not run this on a production server** at this time.  
 
 _No warranty is offered and no responsibility will be taken for damage to systems resulting from the use of this script._
