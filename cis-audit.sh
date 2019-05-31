@@ -624,11 +624,13 @@ test_1.4.2() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        state=0
-        
-        [ $(grep "^set superusers" /boot/grub2/grub.cfg | wc -l) -eq 0 ] && state=1
-        [ $(grep "^password" /boot/grub2/grub.cfg | wc -l ) -eq 0 ] && state=1
-        [ $state -eq 0 ] && result="Pass"
+    state=1
+    
+    ## Note: This test includes checking /boot/grub2/user.cfg which is not defined in the standard,
+    ##  however this file is created by performing the remediation step in the standard so is
+    ##  included in the test here as well.
+    [ $(grep "^GRUB2_PASSWORD=" /boot/grub2/grub.cfg /boot/grub2/user.cfg | wc -l) -ne 0 ] && state=0
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
