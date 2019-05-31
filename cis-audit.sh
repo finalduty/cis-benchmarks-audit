@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ##
-## Copyright 2017 Andy Dustin
+## Copyright 2019 Andy Dustin
 ##
 ## Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except 
 ## in compliance with the License. You may obtain a copy of the License at
@@ -13,6 +13,12 @@
 ## See the License for the specific language governing permissions and limitations under the License.
 ##
 
+## This script checks for compliance against CIS CentOS Linux 7 Benchmark v2.1.1 2017-01-31 measures
+## Each individual standard has it's own function and is forked to the background, allowing for 
+## multiple tests to be run in parallel, reducing execution time.
+
+## You can obtain a copy of the CIS Benchmarks from https://www.cisecurity.org/cis-benchmarks/
+
 ## andy.dustin@gmail.com [rev: a44ceb7]: First Release
 ## andy.dustin@gmail.com [rev: ad63750]: Improved progress ticker display logic 
 ## andy.dustin@gmail.com [rev: ad80cd7]: Updated state tracking on some tests incorrectly failing
@@ -20,10 +26,6 @@
 ## andy.dustin@gmail.com [rev: ae700df]: Fixed output for tests that are skipped using the 'skip_test' function
 ## andy.dustin@gmail.com [rev: ae700e9]: Updated test 6.2.8 to use `stat` instead of `ls`
 ## andy.dustin@gmail.com [rev: ae70116]: Updated tests 5.2.11 and 5.2.12 to support a wider range of configurations of approved Ciphers and MACs in sshd_config. Also added error state for tests. Thanks Darren Foster
-
-## This script checks for compliance against CIS CentOS Linux 7 Benchmark v2.1.1 2017-01-31 measures
-## Each individual standard has it's own function and is forked to the background, allowing for 
-## multiple tests to be run in parallel, reducing execution time.
 
 
 
