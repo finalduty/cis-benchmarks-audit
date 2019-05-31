@@ -1467,14 +1467,14 @@ test_4.1.4() {
     
     ## Tests Start ##
     search_term=time-change
-    expected='-a always,exit -F arch=b64 -S adjtimex -S settimeofday -k time-change\n
-        -a always,exit -F arch=b32 -S adjtimex -S settimeofday -S stime -k time-change\n
-        -a always,exit -F arch=b64 -S clock_settime -k time-change\n
-        -a always,exit -F arch=b32 -S clock_settime -k time-change\n
+    expected='-a always,exit -F arch=b64 -S adjtimex,settimeofday -F key=time-change\n
+        -a always,exit -F arch=b32 -S stime,settimeofday,adjtimex -F key=time-change\n
+        -a always,exit -F arch=b64 -S clock_settime -F key=time-change\n
+        -a always,exit -F arch=b32 -S clock_settime -F key=time-change\n
         -w /etc/localtime -p wa -k time-change'
         
-    diff <(echo -e $expected | sed 's/^\s*//') <(grep $search_term /etc/audit/audit.rules) &>/dev/null && result="Pass"
-   ## Tests End ##
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
     write_result "$id,$description,$scored,$level,$result,$duration"
@@ -1494,8 +1494,8 @@ test_4.1.5() {
         -w /etc/shadow -p wa -k identity\n
         -w /etc/security/opasswd -p wa -k identity'
         
-    diff <(echo -e $expected | sed 's/^\s*//') <(grep $search_term /etc/audit/audit.rules) &>/dev/null && result="Pass"
-   ## Tests End ##
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
     write_result "$id,$description,$scored,$level,$result,$duration"
@@ -1508,16 +1508,21 @@ test_4.1.6() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
+    
+    ## Note: Auditctl performs some translation on the rules entered as per the standard, 
+    ##  so what we end up testing for here is not what is specified in the standard, but 
+    ##  is correct when used in real-world situations.
     search_term="system-locale"
-    expected='-a always,exit -F arch=b64 -S sethostname -S setdomainname -k system-locale\n
-        -a always,exit -F arch=b32 -S sethostname -S setdomainname -k system-locale\n
+    expected='-a always,exit -F arch=b64 -S sethostname,setdomainname -F key=system-locale\n
+        -a always,exit -F arch=b32 -S sethostname,setdomainname -F key=system-locale\n
         -w /etc/issue -p wa -k system-locale\n
         -w /etc/issue.net -p wa -k system-locale\n
         -w /etc/hosts -p wa -k system-locale\n
-        -w /etc/sysconfig/network -p wa -k system-locale'
+        -w /etc/sysconfig/network -p wa -k system-locale\n
+        -w /etc/sysconfig/network-scripts -p wa -k system-locale'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(grep $search_term /etc/audit/audit.rules) &>/dev/null && result="Pass"
-   ## Tests End ##
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
     write_result "$id,$description,$scored,$level,$result,$duration"
@@ -1531,9 +1536,10 @@ test_4.1.7() {
     
     ## Tests Start ##
     search_term="MAC-policy"
-    expected='-w /etc/selinux/ -p wa -k MAC-policy'
+    expected='-w /etc/selinux -p wa -k MAC-policy\n
+        -w /usr/share/selinux -p wa -k MAC-policy'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(grep $search_term /etc/audit/audit.rules) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1547,12 +1553,14 @@ test_4.1.8() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        search_term="logins"
-        expected='-w /var/log/lastlog -p wa -k logins\n
-            -w /var/run/faillock/ -p wa -k logins'
-        
-        diff <(echo -e $expected | sed 's/^\s*//') <(grep $search_term /etc/audit/audit.rules) &>/dev/null && result="Pass"
-   ## Tests End ##
+    search_term="logins"
+    expected='-w /var/log/lastlog -p wa -k logins\n
+        -w /var/run/faillock -p wa -k logins\n
+        -w /var/log/wtmp -p wa -k logins\n
+        -w /var/log/btmp -p wa -k logins'
+    
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
     write_result "$id,$description,$scored,$level,$result,$duration"
@@ -1566,11 +1574,9 @@ test_4.1.9() {
     
     ## Tests Start ##
     search_term="session"
-    expected='-w /var/run/utmp -p wa -k session\n
-        -w /var/log/wtmp -p wa -k session\n
-        -w /var/log/btmp -p wa -k session'
+    expected='-w /var/run/utmp -p wa -k session'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(grep $search_term /etc/audit/audit.rules) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1585,14 +1591,14 @@ test_4.1.10() {
     
     ## Tests Start ##
     search_term="perm_mod"
-    expected='-a always,exit -F arch=b64 -S chmod -S fchmod -S fchmodat -F auid>=1000 -F auid!=4294967295 -k perm_mod\n
-        -a always,exit -F arch=b32 -S chmod -S fchmod -S fchmodat -F auid>=1000 -F auid!=4294967295 -k perm_mod\n
-        -a always,exit -F arch=b64 -S chown -S fchown -S fchownat -S lchown -F auid>=1000 -F auid!=4294967295 -k perm_mod\n
-        -a always,exit -F arch=b32 -S chown -S fchown -S fchownat -S lchown -F auid>=1000 -F auid!=4294967295 -k perm_mod\n
-        -a always,exit -F arch=b64 -S setxattr -S lsetxattr -S fsetxattr -S removexattr -S lremovexattr -S fremovexattr -F auid>=1000 -F auid!=4294967295 -k perm_mod\n
-        -a always,exit -F arch=b32 -S setxattr -S lsetxattr -S fsetxattr -S removexattr -S lremovexattr -S fremovexattr -F auid>=1000 -F auid!=4294967295 -k perm_mod'
+    expected='-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=-1 -F key=perm_mod\n
+        -a always,exit -F arch=b32 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=-1 -F key=perm_mod\n
+        -a always,exit -F arch=b64 -S chown,fchown,lchown,fchownat -F auid>=1000 -F auid!=-1 -F key=perm_mod\n
+        -a always,exit -F arch=b32 -S lchown,fchown,chown,fchownat -F auid>=1000 -F auid!=-1 -F key=perm_mod\n
+        -a always,exit -F arch=b64 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=-1 -F key=perm_mod\n
+        -a always,exit -F arch=b32 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=-1 -F key=perm_mod'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(grep $search_term /etc/audit/audit.rules) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1606,14 +1612,14 @@ test_4.1.11() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        search_term="access"
-        expected='-a always,exit -F arch=b64 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k access\n
-            -a always,exit -F arch=b32 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k access\n
-            -a always,exit -F arch=b64 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k access\n
-            -a always,exit -F arch=b32 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k access'
-        
-        diff <(echo -e $expected | sed 's/^\s*//') <(grep $search_term /etc/audit/audit.rules) &>/dev/null && result="Pass"
-   ## Tests End ##
+    search_term="access"
+    expected='-a always,exit -F arch=b64 -S open,truncate,ftruncate,creat,openat -F exit=-EACCES -F auid>=1000 -F auid!=-1 -F key=access\n
+        -a always,exit -F arch=b32 -S open,creat,truncate,ftruncate,openat -F exit=-EACCES -F auid>=1000 -F auid!=-1 -F key=access\n
+        -a always,exit -F arch=b64 -S open,truncate,ftruncate,creat,openat -F exit=-EPERM -F auid>=1000 -F auid!=-1 -F key=access\n
+        -a always,exit -F arch=b32 -S open,creat,truncate,ftruncate,openat -F exit=-EPERM -F auid>=1000 -F auid!=-1 -F key=access'
+    
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
     write_result "$id,$description,$scored,$level,$result,$duration"
@@ -1626,12 +1632,12 @@ test_4.1.13() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        search_term="mounts"
-        expected='-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=4294967295 -k mounts\n
-            -a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=4294967295 -k mounts'
-        
-        diff <(echo -e $expected | sed 's/^\s*//') <(grep $search_term /etc/audit/audit.rules) &>/dev/null && result="Pass"
-   ## Tests End ##
+    search_term="mounts"
+    expected='-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=-1 -F key=mounts\n
+        -a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=-1 -F key=mounts'
+    
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
     write_result "$id,$description,$scored,$level,$result,$duration"
@@ -1644,12 +1650,12 @@ test_4.1.14() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        search_term="delete"
-        expected='-a always,exit -F arch=b64 -S unlink -S unlinkat -S rename -S renameat -F auid>=1000 -F auid!=4294967295 -k delete\n
-            -a always,exit -F arch=b32 -S unlink -S unlinkat -S rename -S renameat -F auid>=1000 -F auid!=4294967295 -k delete'
-        
-        diff <(echo -e $expected | sed 's/^\s*//') <(grep $search_term /etc/audit/audit.rules) &>/dev/null && result="Pass"
-   ## Tests End ##
+    search_term="key=delete"
+    expected='-a always,exit -F arch=b64 -S rename,unlink,unlinkat,renameat -F auid>=1000 -F auid!=-1 -F key=delete\n
+        -a always,exit -F arch=b32 -S unlink,rename,unlinkat,renameat -F auid>=1000 -F auid!=-1 -F key=delete'
+    
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
     write_result "$id,$description,$scored,$level,$result,$duration"
@@ -1666,7 +1672,7 @@ test_4.1.15() {
     expected='-w /etc/sudoers -p wa -k scope\n
         -w /etc/sudoers.d -p wa -k scope'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(grep $search_term /etc/audit/audit.rules) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1683,7 +1689,7 @@ test_4.1.16() {
     search_term="actions"
     expected='-w /var/log/sudo.log -p wa -k actions'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(grep $search_term /etc/audit/audit.rules) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1697,13 +1703,13 @@ test_4.1.17() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-    search_term="time-change"
+    search_term="modules"
     expected='-w /sbin/insmod -p x -k modules\n
         -w /sbin/rmmod -p x -k modules\n
         -w /sbin/modprobe -p x -k modules\n
-        -a always,exit arch=b64 -S init_module -S delete_module -k modules'
+        -a always,exit -F arch=b64 -S init_module,delete_module -F key=modules'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(grep $search_term /etc/audit/audit.rules) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1717,7 +1723,7 @@ test_4.1.18() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-    [ "$(grep "^\s*[^#]" /etc/audit/audit.rules | tail -1)" == "-e 2" ] && result="Pass"
+    [ "$(auditctl -l | tail -1)" == "-e 2" ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"

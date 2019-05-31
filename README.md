@@ -75,6 +75,27 @@ ID      Description                                                Scoring  Leve
 Passed 13 of 15 tests in 1 seconds (1 Skipped, 0 Errors)
 ```
 
+### Notes / Caveats
+#### Tests 4.1.4 to 4.1.17
+The way that the tests are described in v2.2.0 of the standard do not directly reflect what is returned when querying the system. As such, the 'expected' output for these tests differs slightly to what is defined in the standard.
+
+Users will find that when applying recommended configurations per the standard, that the verify command displays it slightly differently. For instance, in in `4.1.4`, when applying the recommendations as below:
+```
+-a always,exit -F arch=b32 -S adjtimex -S settimeofday -S stime -k time-change
+-a always,exit -F arch=b32 -S clock_settime -k time-change
+```
+
+The output from `auditctl -l` actually shows:
+```
+-a always,exit -F arch=b64 -S adjtimex,settimeofday -F key=time-change
+-a always,exit -F arch=b32 -S stime,settimeofday,adjtimex -F key=time-change
+```
+
+####Test 4.1.8 & 4.1.9
+The way the v2.2.0 standard lists the requirements to pass `4.1.8` and `4.1.9` conflicts with each other when looking at the 'logins' terms used.
+
+This tool deviates from the standard here and includes the 'logins' portions of `4.1.9` in `4.1.8` instead. It is anticipated that users going for compliance against these two recommendations would do so at the same time and should not notice any difference between the implementation and the standard.
+
 #### Disclaimer:
 This is not a replacement for a full audit and a passing result from this script does not necessarily mean that you are compliant (but it should give you a good idea of where to start).  
 
