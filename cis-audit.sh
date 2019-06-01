@@ -158,7 +158,7 @@ now() {
 outputter() {
     write_debug "Formatting and writing results to STDOUT"
     echo
-    echo " CIS CentOS 7 Benchmark v2.1.1 Results "
+    echo " CIS CentOS 7 Benchmark v2.2.0 Results "
     echo "---------------------------------------"
     
     if [ -t 1 -a $color == "True" ]; then
@@ -421,6 +421,23 @@ test_is_installed() {
     duration="$(test_finish $id $test_start_time)ms"
     write_result "$id,$description,$scored,$level,$result,$duration"
 }
+test_is_not_installed() {
+    id=$1
+    level=$2
+    pkg=$3
+    name=$4
+    description="Ensure $name is not installed"
+    scored="Scored"
+    test_start_time=$(test_start $id)
+    
+    ## Tests Start ##
+    [ $(rpm -q $pkg &>/dev/null; echo $?) -eq 0 ] || result="Pass"
+    ## Tests End ##
+    
+    duration="$(test_finish $id $test_start_time)ms"
+    write_result "$id,$description,$scored,$level,$result,$duration"
+}
+
 test_perms() {
     id=$1
     level=$2
@@ -667,7 +684,7 @@ test_1.5.1() {
     
     [ "$(grep "hard core" /etc/security/limits.conf /etc/security/limits.d/* | sed 's/^.*://' )" == "* hard core 0" ] || state=1
     [ "$(sysctl fs.suid_dumpable)" == "fs.suid_dumpable = 0" ] || state=1
-    [ "$(grep "fs.suid_dumpable" /etc/sysctl.conf /etc/sysctl.d/*)" == "fs.suid_dumpable = 0" ] || state=1
+    [ "$(grep "fs.suid_dumpable" /etc/sysctl.conf /etc/sysctl.d/*.conf | sed 's/^.*://')" == "fs.suid_dumpable = 0" ] || state=1
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
@@ -701,7 +718,7 @@ test_1.5.3() {
     
     ## Tests Start ##
     [ "$(sysctl kernel.randomize_va_space)" == "kernel.randomize_va_space = 2" ] || state=1
-    [ "$(grep "kernel\.randomize_va_space" /etc/sysctl.conf /etc/sysctl.d/*)" == "kernel.randomize_va_space = 2" ] || state=1
+    [ "$(grep "kernel.randomize_va_space" /etc/sysctl.conf /etc/sysctl.d/*.conf | sed 's/^.*://')" == "kernel.randomize_va_space = 2" ] || state=1
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
@@ -1019,7 +1036,7 @@ test_2.2.1.2() {
     if [ $( rpm -q ntp &>/dev/null; echo $?) -eq 0 ]; then
         grep "^restrict -4 kod nomodify notrap nopeer noquery" /etc/ntpd.conf &>/dev/null || state=1
         grep "^restrict -6 kod nomodify notrap nopeer noquery" /etc/ntpd.conf &>/dev/null || state=2
-        grep "^(server|pool) .*$" /etc/ntpd.conf &>/dev/null || state=4
+        egrep "^(server|pool) .*$" /etc/ntpd.conf &>/dev/null || state=4
         [ -f /etc/systemd/system/ntpd.service ] && file="/etc/systemd/system/ntpd.service" || file="/usr/lib/systemd/system/ntpd.service"
         [ $(grep -c 'OPTIONS="-u ntp:ntp' /etc/sysconfig/ntpd) -ne 0 -o $(grep -c 'ExecStart=/usr/sbin/ntpd -u ntp:ntp $OPTIONS' $file) -ne 0 ] || state=8
         
@@ -1043,7 +1060,7 @@ test_2.2.1.3() {
     
     ## Tests Start ##
     if [ $( rpm -q chrony &>/dev/null; echo $? ) -eq 0 ]; then
-        grep "^(server|pool) .*$" /etc/chrony.conf &>/dev/null || state=$(( $state + 1 ))
+        egrep "^(server|pool) .*$" /etc/chrony.conf &>/dev/null || state=$(( $state + 1 ))
         
         if [ -f /etc/sysconfig/chronyd ]; then
             [ $( grep -c 'OPTIONS="-u chrony' /etc/sysconfig/chronyd ) -eq 0 ] && state=$(( $state + 2 ))
@@ -1194,7 +1211,7 @@ test_3.x-single() {
     
     ## Tests Start ##
     [ "$(sysctl net.$protocol.$sysctl)" == "net.$protocol.$sysctl = $val" ] && result="Pass"
-    [ "$(grep "net.$protocol.$sysctl" /etc/sysctl.conf /etc/sysctl.d/*)" == "net.$protocol.$sysctl = $val" ] || state=1
+    [ "$(grep "net.$protocol.$sysctl" /etc/sysctl.conf /etc/sysctl.d/*.conf | sed 's/^.*://')" == "net.$protocol.$sysctl = $val" ] || state=1
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1212,10 +1229,10 @@ test_3.x-double() {
     
     ## Tests Start ##
     [ "$(sysctl net.$protocol.conf.all.$sysctl)" == "net.$protocol.conf.all.$sysctl = $val" ] || state=1
-    [ "$(grep "net.$protocol.conf.all.$sysctl" /etc/sysctl.conf /etc/sysctl.d/*)" == "net.$protocol.conf.all.$sysctl = $val" ] || state=2
+    [ "$(grep "net.$protocol.conf.all.$sysctl" /etc/sysctl.conf /etc/sysctl.d/*.conf | sed 's/^.*://')" == "net.$protocol.conf.all.$sysctl = $val" ] || state=2
     
     [ "$(sysctl net.$protocol.conf.default.$sysctl)" == "net.$protocol.conf.default.$sysctl = $val" ] || state=4
-    [ "$(grep "net.$protocol.conf.default.$sysctl" /etc/sysctl.conf /etc/sysctl.d/*)" == "net.$protocol.conf.default.$sysctl = $val" ] || state=8
+    [ "$(grep "net.$protocol.conf.default.$sysctl" /etc/sysctl.conf /etc/sysctl.d/*.conf | sed 's/^.*://')" == "net.$protocol.conf.default.$sysctl = $val" ] || state=8
     
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
@@ -1238,7 +1255,7 @@ test_3.3.3() {
     audit_lines=$(grep -c "\s+linux.*ipv6.disable=1" /boot/grub2/grub.cfg)
     [ $linux_lines -eq $audit_lines ] && state=0
 
-    [ $state -eq 0 ] && result="Passed"
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1484,7 +1501,7 @@ test_4.1.4() {
         -a always,exit -F arch=b32 -S clock_settime -F key=time-change\n
         -w /etc/localtime -p wa -k time-change'
         
-    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1505,7 +1522,7 @@ test_4.1.5() {
         -w /etc/shadow -p wa -k identity\n
         -w /etc/security/opasswd -p wa -k identity'
         
-    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1532,7 +1549,7 @@ test_4.1.6() {
         -w /etc/sysconfig/network -p wa -k system-locale\n
         -w /etc/sysconfig/network-scripts -p wa -k system-locale'
     
-    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1550,7 +1567,7 @@ test_4.1.7() {
     expected='-w /etc/selinux -p wa -k MAC-policy\n
         -w /usr/share/selinux -p wa -k MAC-policy'
     
-    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1570,7 +1587,7 @@ test_4.1.8() {
         -w /var/log/wtmp -p wa -k logins\n
         -w /var/log/btmp -p wa -k logins'
     
-    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1587,7 +1604,7 @@ test_4.1.9() {
     search_term="session"
     expected='-w /var/run/utmp -p wa -k session'
     
-    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1609,7 +1626,7 @@ test_4.1.10() {
         -a always,exit -F arch=b64 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=-1 -F key=perm_mod\n
         -a always,exit -F arch=b32 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=-1 -F key=perm_mod'
     
-    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1629,7 +1646,7 @@ test_4.1.11() {
         -a always,exit -F arch=b64 -S open,truncate,ftruncate,creat,openat -F exit=-EPERM -F auid>=1000 -F auid!=-1 -F key=access\n
         -a always,exit -F arch=b32 -S open,creat,truncate,ftruncate,openat -F exit=-EPERM -F auid>=1000 -F auid!=-1 -F key=access'
     
-    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1647,7 +1664,7 @@ test_4.1.13() {
     expected='-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=-1 -F key=mounts\n
         -a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=-1 -F key=mounts'
     
-    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1665,7 +1682,7 @@ test_4.1.14() {
     expected='-a always,exit -F arch=b64 -S rename,unlink,unlinkat,renameat -F auid>=1000 -F auid!=-1 -F key=delete\n
         -a always,exit -F arch=b32 -S unlink,rename,unlinkat,renameat -F auid>=1000 -F auid!=-1 -F key=delete'
     
-    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1683,7 +1700,7 @@ test_4.1.15() {
     expected='-w /etc/sudoers -p wa -k scope\n
         -w /etc/sudoers.d -p wa -k scope'
     
-    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1700,7 +1717,7 @@ test_4.1.16() {
     search_term="actions"
     expected='-w /var/log/sudo.log -p wa -k actions'
     
-    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1720,7 +1737,7 @@ test_4.1.17() {
         -w /sbin/modprobe -p x -k modules\n
         -a always,exit -F arch=b64 -S init_module,delete_module -F key=modules'
     
-    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -2948,7 +2965,7 @@ if [ $(is_test_included 3; echo $?) -eq 0 ]; then   write_cache "3,Network Confi
     fi
     ## This test deviates from the benchmark's audit steps. The assumption here is that if you are on a server
     ## then you shouldn't have the wireless-tools installed for you to even use wireless interfaces
-    run_test 3.7 1 test_is_installed wireless-tools "wireless interfaces"   ## 3.7 Ensure wireless interfacs are disabled (Not Scored)
+    run_test 3.7 1 test_is_not_installed wireless-tools "wireless-tools"   ## 3.7 Ensure wireless interfaces are disabled (Not Scored)
 fi
 
 ## Section 4 - Logging and Auditing

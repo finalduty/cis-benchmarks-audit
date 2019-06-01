@@ -76,6 +76,10 @@ Passed 13 of 15 tests in 1 seconds (1 Skipped, 0 Errors)
 ```
 
 ### Notes / Caveats
+#### Test 3.7
+_Ensure wireless interfaces are disabled (Not Scored)_
+This test deviates from the benchmark's audit steps. The assumption here is that if you are on a server then you shouldn't have the wireless-tools installed for you to even use wireless interfaces and if you're on a laptop, you almost certainly want wireless access nowadays.
+
 #### Tests 4.1.4 to 4.1.17
 The way that the tests are described in v2.2.0 of the standard do not directly reflect what is returned when querying the system. As such, the 'expected' output for these tests differs slightly to what is defined in the standard.
 
