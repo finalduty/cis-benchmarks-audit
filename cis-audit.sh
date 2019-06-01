@@ -2434,7 +2434,7 @@ test_6.2.x-legacy_entries() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-    [ $(grep -c '^+:' $file) -eq 0 ] || state=1
+    [ $(grep -c '^\+:' $file) -eq 0 ] || state=1
     
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
@@ -3065,11 +3065,11 @@ if [ $(is_test_included 6; echo $?) -eq 0 ]; then   write_cache "6,System Mainte
         run_test 6.1.2 1 test_perms 644 /etc/passwd   ## 6.1.2 Ensure permissions on /etc/passwd are configured (Scored)
         run_test 6.1.3 1 test_perms 000 /etc/shadow   ## 6.1.3 Ensure permissions on /etc/shadow are configured (Scored)
         run_test 6.1.4 1 test_perms 644 /etc/group   ## 6.1.4 Ensure permissions on /etc/group are configured (Scored)
-        run_test 6.1.5 1 test_perms 600 /etc/gshadow   ## 6.1.5 Ensure permissions on /etc/gshadow are configured (Scored)
-        run_test 6.1.6 1 test_perms 600 /etc/passwd-   ## 6.1.6 Ensure permissions on /etc/passwd- are configured (Scored)
-        run_test 6.1.7 1 test_perms 600 /etc/shadow-   ## 6.1.7 Ensure permissions on /etc/shadow- are configured (Scored)
-        run_test 6.1.8 1 test_perms 600 /etc/group-   ## 6.1.8 Ensure permissions on /etc/group- are configured (Scored)
-        run_test 6.1.9 1 test_perms 600 /etc/gshadow-   ## 6.1.9 Ensure permissions on /etc/gshadow- are configured (Scored)
+        run_test 6.1.5 1 test_perms 000 /etc/gshadow   ## 6.1.5 Ensure permissions on /etc/gshadow are configured (Scored)
+        run_test 6.1.6 1 test_perms 644 /etc/passwd-   ## 6.1.6 Ensure permissions on /etc/passwd- are configured (Scored)
+        run_test 6.1.7 1 test_perms 000 /etc/shadow-   ## 6.1.7 Ensure permissions on /etc/shadow- are configured (Scored)
+        run_test 6.1.8 1 test_perms 644 /etc/group-   ## 6.1.8 Ensure permissions on /etc/group- are configured (Scored)
+        run_test 6.1.9 1 test_perms 000 /etc/gshadow-   ## 6.1.9 Ensure permissions on /etc/gshadow- are configured (Scored)
         run_test 6.1.10 1 test_6.1.10   ## Ensure no world-writable files exist (Scored)
         run_test 6.1.11 1 test_6.1.11   ## Ensure no unowned files or directories exist (Scored)
         run_test 6.1.12 1 test_6.1.12   ## Ensure no ungrouped files or directories exist (Scored)
