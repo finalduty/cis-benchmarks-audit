@@ -462,9 +462,9 @@ test_1.1.1.x() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        [ $(diff -qsZ <(modprobe -n -v $filesystem 2>/dev/null | tail -1) <(echo "install /bin/true") &>/dev/null; echo $?) -ne 0 ] && state=$(( $state + 1 ))
-        [ $(lsmod | grep $filesystem | wc -l) -ne 0 ] && state=$(( $state + 2 ))
-        [ $state -eq 0 ] && result="Pass"
+    [ $(diff -qsZ <(modprobe -n -v $filesystem 2>/dev/null | tail -1) <(echo "install /bin/true") &>/dev/null; echo $?) -ne 0 ] && state=$(( $state + 1 ))
+    [ $(lsmod | grep $filesystem | wc -l) -ne 0 ] && state=$(( $state + 2 ))
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -479,7 +479,7 @@ test_1.1.x-check_partition() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        mount | grep "$partition " &>/dev/null  && result="Pass"
+    mount | grep "$partition " &>/dev/null  && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -495,7 +495,7 @@ test_1.1.x-check_fs_opts() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        mount | egrep "$partition .*,$fs_opt," &>/dev/null  && result="Pass"
+    mount | egrep "$partition .*,$fs_opt," &>/dev/null  && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -510,18 +510,18 @@ test_1.1.x-check_removable() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        ## NB: Only usb media is supported at the moment. Need to investigate what 
-        ##  difference a CDROM, etc. can make, but I've set it up ready to add 
-        ##  another search term. You're welcome :)
-        devices=$(lsblk -pnlS | awk '/usb/ {print $1}')
-        filesystems=$(for device in "$devices"; do lsblk -nlp $device | egrep -v '^$device|[SWAP]' | awk '{print $1}'; done)
+    ## Note: Only usb media is supported at the moment. Need to investigate what 
+    ##  difference a CDROM, etc. can make, but I've set it up ready to add 
+    ##  another search term. You're welcome :)
+    devices=$(lsblk -pnlS | awk '/usb/ {print $1}')
+    filesystems=$(for device in "$devices"; do lsblk -nlp $device | egrep -v '^$device|[SWAP]' | awk '{print $1}'; done)
+    
+    for filesystem in $filesystems; do
+        fs_without_opt=$(mount | grep "$filesystem " | grep -v $fs_opt &>/dev/null | wc -l)
+        [ $fs_without_opt -ne 0 ]  && state=1
+    done
         
-        for filesystem in $filesystems; do
-            fs_without_opt=$(mount | grep "$filesystem " | grep -v $fs_opt &>/dev/null | wc -l)
-            [ $fs_without_opt -ne 0 ]  && state=1
-        done
-            
-        [ $state -eq 0 ] && result=Pass
+    [ $state -eq 0 ] && result=Pass
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -535,8 +535,8 @@ test_1.1.21() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        dirs=$(df --local -P | awk '{if (NR!=1) print $6}' | xargs -I '{}' find '{}' -xdev -type d \( -perm -0002 -a ! -perm -1000 \) 2>/dev/null | wc -l)
-        [ $dirs -eq 0 ] && result=Pass
+    dirs=$(df --local -P | awk '{if (NR!=1) print $6}' | xargs -I '{}' find '{}' -xdev -type d \( -perm -0002 -a ! -perm -1000 \) 2>/dev/null | wc -l)
+    [ $dirs -eq 0 ] && result=Pass
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -550,10 +550,9 @@ test_1.1.22() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        ## Check whether autofs is even installed first
-        service=$(systemctl | awk '/autofs/ {print $1}')
-        [ -n "$service" ] && systemctl is-enabled $service 
-        [ $? -ne 0 ]  && result="Pass"
+    service=$(systemctl | awk '/autofs/ {print $1}')
+    [ -n "$service" ] && systemctl is-enabled $service 
+    [ $? -ne 0 ]  && result="Pass"
     ## Tests End ##
 
     duration="$(test_finish $id $test_start_time)ms"
@@ -567,8 +566,8 @@ test_1.2.1() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        repolist=$(yum repolist 2>/dev/null)
-        [ $(echo "$repolist" | egrep -c '^base/7/') -ne 0 -a $(echo "$repolist" | egrep -c '^updates/7/') -ne 0 ] && result="Pass"
+    repolist=$(yum repolist 2>/dev/null)
+    [ $(echo "$repolist" | egrep -c '^base/7/') -ne 0 -a $(echo "$repolist" | egrep -c '^updates/7/') -ne 0 ] && result="Pass"
     ## Tests End
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -582,7 +581,7 @@ test_1.2.2() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        [ $(rpm -q gpg-pubkey | wc -l) -ne 0 ] && result="Pass"
+    [ $(rpm -q gpg-pubkey | wc -l) -ne 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -596,7 +595,7 @@ test_1.2.3() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        [ $(grep -R ^gpgcheck=0 /etc/yum.conf /etc/yum.repos.d/ | wc -l) -eq 0 ] && result="Pass"
+    [ $(grep -R ^gpgcheck=0 /etc/yum.conf /etc/yum.repos.d/ | wc -l) -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -610,7 +609,7 @@ test_1.3.2() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        [ $(grep -Rl 'aide' /var/spool/cron/root /etc/cron* 2>/dev/null | wc -l) -ne 0 ] && result="Pass"
+    [ $(grep -Rl 'aide' /var/spool/cron/root /etc/cron* 2>/dev/null | wc -l) -ne 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -640,16 +639,16 @@ test_1.4.3() {
     id=$1
     level=$2
     description="Ensure authentication required for single user mode"
-    scored="Not Scored"
+    scored="Scored"
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        state=0
-        str='ExecStart=-/bin/sh -c "/usr/sbin/sulogin; /usr/bin/systemctl --fail --no-block default"'
-        
-        [ "$(grep /sbin/sulogin /usr/lib/systemd/system/rescue.service)" == "$str" ] || state=1
-        [ "$(grep /sbin/sulogin /usr/lib/systemd/system/emergency.service)" == "$str" ] || state=1
-        [ $state -eq 0 ] && result="Pass"
+    state=0
+    str='ExecStart=-/bin/sh -c "/usr/sbin/sulogin; /usr/bin/systemctl --fail --no-block default"'
+    
+    [ "$(grep /sbin/sulogin /usr/lib/systemd/system/rescue.service)" == "$str" ] || state=1
+    [ "$(grep /sbin/sulogin /usr/lib/systemd/system/emergency.service)" == "$str" ] || state=1
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -663,12 +662,13 @@ test_1.5.1() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        state=0
-        str='ExecStart=-/bin/sh -c "/usr/sbin/sulogin; /usr/bin/systemctl --fail --no-block default"'
-        
-        [ "$(grep "hard core" /etc/security/limits.conf /etc/security/limits.d/* | sed 's/^.*://' )" == "* hard core 0" ] || state=1
-        [ "$(sysctl fs.suid_dumpable)" == "fs.suid_dumpable = 0" ] || state=1
-        [ $state -eq 0 ] && result="Pass"
+    state=0
+    str='ExecStart=-/bin/sh -c "/usr/sbin/sulogin; /usr/bin/systemctl --fail --no-block default"'
+    
+    [ "$(grep "hard core" /etc/security/limits.conf /etc/security/limits.d/* | sed 's/^.*://' )" == "* hard core 0" ] || state=1
+    [ "$(sysctl fs.suid_dumpable)" == "fs.suid_dumpable = 0" ] || state=1
+    [ "$(grep "fs.suid_dumpable" /etc/sysctl.conf /etc/sysctl.d/*)" == "fs.suid_dumpable = 0" ] || state=1
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -682,11 +682,11 @@ test_1.5.2() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        state=0
-        str='ExecStart=-/bin/sh -c "/usr/sbin/sulogin; /usr/bin/systemctl --fail --no-block default"'
-        
-        [ "$(dmesg | grep -o "NX (Execute Disable).*")" == "NX (Execute Disable) protection: active" ] || state=1
-        [ $state -eq 0 ] && result="Pass"
+    state=0
+    str='ExecStart=-/bin/sh -c "/usr/sbin/sulogin; /usr/bin/systemctl --fail --no-block default"'
+    
+    [ "$(dmesg | grep -o "NX (Execute Disable).*")" == "NX (Execute Disable) protection: active" ] || state=1
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -700,10 +700,9 @@ test_1.5.3() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        str='ExecStart=-/bin/sh -c "/usr/sbin/sulogin; /usr/bin/systemctl --fail --no-block default"'
-        
-        [ "$(sysctl kernel.randomize_va_space)" == "kernel.randomize_va_space = 2" ] || state=1
-        [ $state -eq 0 ] && result="Pass"
+    [ "$(sysctl kernel.randomize_va_space)" == "kernel.randomize_va_space = 2" ] || state=1
+    [ "$(grep "kernel\.randomize_va_space" /etc/sysctl.conf /etc/sysctl.d/*)" == "kernel.randomize_va_space = 2" ] || state=1
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -717,11 +716,11 @@ test_1.5.4() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        state=0
-        str='ExecStart=-/bin/sh -c "/usr/sbin/sulogin; /usr/bin/systemctl --fail --no-block default"'
-        
-        [ "$(rpm -q prelink)" == "package prelink is not installed" ] || state=1
-        [ $state -eq 0 ] && result="Pass"
+    state=0
+    str='ExecStart=-/bin/sh -c "/usr/sbin/sulogin; /usr/bin/systemctl --fail --no-block default"'
+    
+    [ "$(rpm -q prelink)" == "package prelink is not installed" ] || state=1
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -735,10 +734,10 @@ test_1.6.1.1() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        state=0
-    
-        [ $(grep "^\s*linux" /boot/grub2/grub.cfg | egrep 'selinux=0|enforcing=0' | wc -l) -eq 0 ] || state=1
-        [ $state -eq 0 ] && result="Pass"
+    state=0
+
+    [ $(grep "^\s*linux" /boot/grub2/grub.cfg | egrep 'selinux=0|enforcing=0' | wc -l) -eq 0 ] || state=1
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -752,11 +751,11 @@ test_1.6.1.2() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        state=0
-        
-        [ "$(grep SELINUX=enforcing /etc/selinux/config)" == "SELINUX=enforcing" ] || state=1
-        [ "$(sestatus | awk '/Current mode/ {print $3}')" == "enforcing" ] || state=1
-        [ $state -eq 0 ] && result="Pass"
+    state=0
+    
+    [ "$(grep SELINUX=enforcing /etc/selinux/config)" == "SELINUX=enforcing" ] || state=1
+    [ "$(sestatus | awk '/Current mode/ {print $3}')" == "enforcing" ] || state=1
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -770,11 +769,11 @@ test_1.6.1.3() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        state=0
-        
-        [ "$(grep SELINUXTYPE=targeted /etc/selinux/config)" == "SELINUXTYPE=targeted" ] || state=1
-        [ "$(sestatus | awk '/Loaded policy name/ {print $4}')" == "targeted" ] || state=1
-        [ $state -eq 0 ] && result="Pass"
+    state=0
+    
+    [ "$(grep SELINUXTYPE=targeted /etc/selinux/config)" == "SELINUXTYPE=targeted" ] || state=1
+    [ "$(sestatus | awk '/Loaded policy name/ {print $4}')" == "targeted" ] || state=1
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -788,10 +787,10 @@ test_1.6.1.4() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        state=0
-        
-        [ "$(rpm -q setroubleshoot)" == "package setroubleshoot is not installed" ] || state=1
-        [ $state -eq 0 ] && result="Pass"
+    state=0
+    
+    [ "$(rpm -q setroubleshoot)" == "package setroubleshoot is not installed" ] || state=1
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
 
     duration="$(test_finish $id $test_start_time)ms"
@@ -805,10 +804,10 @@ test_1.6.1.5() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        state=0
-        
-        [ "$(rpm -q mcstrans)" == "package mcstrans is not installed" ] || state=1
-        [ $state -eq 0 ] && result="Pass"
+    state=0
+    
+    [ "$(rpm -q mcstrans)" == "package mcstrans is not installed" ] || state=1
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -822,10 +821,10 @@ test_1.6.1.6() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        state=0
-        
-        [ "$(ps -eZ | egrep "initrc" | egrep -vw "tr|ps|egrep|bash|awk" | tr ':' ' ' | awk '{print $NF}' | wc -l)" -eq 0 ] || state=1
-        [ $state -eq 0 ] && result="Pass"
+    state=0
+    
+    [ "$(ps -eZ | egrep "initrc" | egrep -vw "tr|ps|egrep|bash|awk" | tr ':' ' ' | awk '{print $NF}' | wc -l)" -eq 0 ] || state=1
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
 
     duration="$(test_finish $id $test_start_time)ms"
@@ -839,11 +838,11 @@ test_1.7.1.1() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        state=0
-        
-        [ $(wc -l /etc/motd | awk '{print $1}') -gt 0 ] || state=1
-        [ $(egrep '(\\v|\\r|\\m|\\s)' /etc/motd | wc -l) -eq 0 ] || state=1
-        [ $state -eq 0 ] && result="Pass"
+    state=0
+    
+    [ $(wc -l /etc/motd | awk '{print $1}') -gt 0 ] || state=1
+    [ $(egrep '(\\v|\\r|\\m|\\s)' /etc/motd | wc -l) -eq 0 ] || state=1
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
 
     duration="$(test_finish $id $test_start_time)ms"
@@ -857,11 +856,11 @@ test_1.7.1.2() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        state=0
-        
-        [ $(wc -l /etc/issue | awk '{print $1}') -gt 0 ] || state=1
-        [ $(egrep '(\\v|\\r|\\m|\\s)' /etc/issue | wc -l) -eq 0 ] || state=1
-        [ $state -eq 0 ] && result="Pass"
+    state=0
+    
+    [ $(wc -l /etc/issue | awk '{print $1}') -gt 0 ] || state=1
+    [ $(egrep '(\\v|\\r|\\m|\\s)' /etc/issue | wc -l) -eq 0 ] || state=1
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
 
     duration="$(test_finish $id $test_start_time)ms"
@@ -875,11 +874,11 @@ test_1.7.1.3() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        state=0
-        
-        [ $(wc -l /etc/issue.net | awk '{print $1}') -gt 0 ] || state=1
-        [ $(egrep '(\\v|\\r|\\m|\\s)' /etc/issue.net | wc -l) -eq 0 ] || state=1
-        [ $state -eq 0 ] && result="Pass"
+    state=0
+    
+    [ $(wc -l /etc/issue.net | awk '{print $1}') -gt 0 ] || state=1
+    [ $(egrep '(\\v|\\r|\\m|\\s)' /etc/issue.net | wc -l) -eq 0 ] || state=1
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
 
     duration="$(test_finish $id $test_start_time)ms"
@@ -893,22 +892,22 @@ test_1.7.2() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        state=0
-        gdm_file="/etc/dconf/profile/gdm"
-        banner_file="/etc/dconf/db/gdm.d/01-banner-message"
-        
-        if [ "$(rpm -q gdm)" != "package gdm is not installed" ]; then
-            if [ -f $file ]; then
-                diff -qs $file <( echo -e "user-db:user\nsystem-db:gdm\nfile-db:/usr/share/gdm/greeter-dconf-defaults\n") || state=1
-            else
-                state=2
-            fi
-            
-            egrep '^banner-message-enable=true' $banner_file || state=4
-            egrep '^banner-message-text=.*' $banner_file || state=8
+    state=0
+    gdm_file="/etc/dconf/profile/gdm"
+    banner_file="/etc/dconf/db/gdm.d/01-banner-message"
+    
+    if [ "$(rpm -q gdm)" != "package gdm is not installed" ]; then
+        if [ -f $file ]; then
+            diff -qs $file <( echo -e "user-db:user\nsystem-db:gdm\nfile-db:/usr/share/gdm/greeter-dconf-defaults\n") || state=1
+        else
+            state=2
         fi
         
-        [ $state -eq 0 ] && result="Pass"
+        egrep '^banner-message-enable=true' $banner_file || state=4
+        egrep '^banner-message-text=.*' $banner_file || state=8
+    fi
+    
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -918,11 +917,11 @@ test_1.8() {
     id=$1
     level=$2
     description="Ensure updates are installed"
-    scored="Not Scored"
+    scored="Scored"
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        [ $(yum check-update &>/dev/null; echo $?) -eq 0 ] && result="Pass"
+    [ $(yum check-update --security &>/dev/null; echo $?) -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -2760,7 +2759,7 @@ if [ $(is_test_included 1; echo $?) -eq 0 ]; then   write_cache "1,Initial Setup
             run_test 1.1.1.5 1 test_1.1.1.x hfsplus   ## Ensure mounting of hfsplus is disabled
             run_test 1.1.1.6 1 test_1.1.1.x squashfs   ## Ensure mounting of squashfs is disabled
             run_test 1.1.1.7 1 test_1.1.1.x udf   ## Ensure mounting of udf is disabled
-            run_test 1.1.1.8 1 test_1.1.1.x vfat   ## Ensure mounting of vfat is disabled
+            run_test 1.1.1.8 2 test_1.1.1.x vfat   ## Ensure mounting of vfat is disabled
         fi
         run_test 1.1.2 2 test_1.1.x-check_partition /tmp   ## 1.1.2 Ensure separate partition exists for /tmp
         run_test 1.1.3 1 test_1.1.x-check_fs_opts /tmp nodev   ## 1.1.3 Ensure nodev option set on /tmp
