@@ -2103,24 +2103,12 @@ test_5.3.1() {
     state=0
     
     ## Tests Start ##
-    file="/etc/security/pwquality.conf"
-    
-    [ $(grep -c "^password requisite pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/password-auth) -eq 1 ] || state=$(( $state + 1 ))
-    [ $(grep -c "^password requisite pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/system-auth) -eq 1 ] || state=$(( $state + 2 ))
-    
-    if [ "$(grep -c "^minlen=" $file)" -eq 1 ]; then
-        [ "$(grep "^minlen=" $file | sed 's/^.*=//' )" -ge 14 ] || state=$(( $state + 4 ))
-    else
-        state=$(( $state + 8 ))
-    fi
-    
-    for i in dcredit ucredit ocredit lcredit; do
-        if [ "$(grep -c "^$i=" $file)" -eq 1 ]; then
-            [ "$(grep "^$i=" $file | sed 's/^.*=-//' )" -ge 1 ] || state=$(( $state + 16 ))
-        else
-            state=$(( $state + 32 ))
-        fi
-    done
+    ## Notes: Per the standard - Additional module options may be set, recommendation 
+    ## requirements only cover including try_first_pass and minlen set to 14 or more.
+        
+    [ "$(grep -c "^password\s*requisite\s*pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/password-auth)" -eq 1 ] || state=$(( $state + 1 ))
+    [ "$(grep -c "^password\s*requisite\s*pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/system-auth)" -eq 1 ] || state=$(( $state + 2 ))
+    [ "$(awk '/^(\s*)?minlen = / {print $3}' /etc/security/pwquality.conf)" -ge 14 ] || state=$(( $state + 4 ))
 
     [ $state -eq 0 ]&& result="Pass"
     write_debug "Test $id finished with end state of $state"
