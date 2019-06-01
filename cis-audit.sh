@@ -964,14 +964,12 @@ test_2.1.6() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        str=$(chkconfig --list 2>&1)
-        state=0
-        
-        if [ $(echo "$str" | egrep -c tftp) -gt 0 ]; then
-            [ $(echo "$str" | awk '/tftp/ {print $2}') == "off" ] || state=1
-        fi
+    state=0
+    str=$(chkconfig --list 2>&1)
     
-        [ $state -eq 0 ] && result=Pass
+    [ "$(chkconfig --list 2>&1 | awk '/tftp/ {print $2}')" == "on" ] && state=1
+    
+    [ $state -eq 0 ] && result=Pass
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1021,7 +1019,7 @@ test_2.2.1.2() {
     if [ $( rpm -q ntp &>/dev/null; echo $?) -eq 0 ]; then
         grep "^restrict -4 kod nomodify notrap nopeer noquery" /etc/ntpd.conf &>/dev/null || state=1
         grep "^restrict -6 kod nomodify notrap nopeer noquery" /etc/ntpd.conf &>/dev/null || state=2
-        grep "^server .*$" /etc/ntpd.conf &>/dev/null || state=4
+        grep "^(server|pool) .*$" /etc/ntpd.conf &>/dev/null || state=4
         [ -f /etc/systemd/system/ntpd.service ] && file="/etc/systemd/system/ntpd.service" || file="/usr/lib/systemd/system/ntpd.service"
         [ $(grep -c 'OPTIONS="-u ntp:ntp' /etc/sysconfig/ntpd) -ne 0 -o $(grep -c 'ExecStart=/usr/sbin/ntpd -u ntp:ntp $OPTIONS' $file) -ne 0 ] || state=8
         
@@ -1045,7 +1043,8 @@ test_2.2.1.3() {
     
     ## Tests Start ##
     if [ $( rpm -q chrony &>/dev/null; echo $? ) -eq 0 ]; then
-        grep "^server .*$" /etc/chrony.conf &>/dev/null || state=$(( $state + 1 ))
+        grep "^(server|pool) .*$" /etc/chrony.conf &>/dev/null || state=$(( $state + 1 ))
+        
         if [ -f /etc/sysconfig/chronyd ]; then
             [ $( grep -c 'OPTIONS="-u chrony' /etc/sysconfig/chronyd ) -eq 0 ] && state=$(( $state + 2 ))
         else
@@ -1109,6 +1108,7 @@ test_2.2.7() {
     
     ## Tests Start ##
     if [ $(rpm -q nfs-utils &>/dev/null; echo $?) -eq 0 ]; then
+        [ $(systemctl is-enabled nfs.service) == "disabled" ] || state=1
         [ $(systemctl is-enabled nfs-server.service) == "disabled" ] || state=1
         [ $(netstat -tupln | egrep ":2049 " | wc -l) -eq 0 ] || state=2
     fi
@@ -1131,7 +1131,7 @@ test_2.2.15() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        [ $(netstat -tupln | egrep -v '127.0.0.1|::1:' | grep :25 | wc -l) -eq 0 ] && result="Pass"
+    [ $(netstat -tupln | egrep -v '127.0.0.1|::1:' | grep ":25\s" | wc -l) -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
