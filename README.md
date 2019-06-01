@@ -91,10 +91,18 @@ The output from `auditctl -l` actually shows:
 -a always,exit -F arch=b32 -S stime,settimeofday,adjtimex -F key=time-change
 ```
 
-#### Test 4.1.8 & 4.1.9
+#### Tests 4.1.8 & 4.1.9
 The way the v2.2.0 standard lists the requirements to pass `4.1.8` and `4.1.9` conflicts with each other when looking at the 'logins' terms used.
 
 This tool deviates from the standard here and includes the 'logins' portions of `4.1.9` in `4.1.8` instead. It is anticipated that users going for compliance against these two recommendations would do so at the same time and should not notice any difference between the implementation and the standard.
+
+#### Test 5.4.1.1
+In v2.1.1 of the benchmarks, the max password age was set to 90 days. In v2.2.0, the max age was set to 365 days. Whilst this script has been updated to be in line with v2.2.0, this test has been held back at the v2.1.1 value of 90 days.
+
+#### Test 5.4.4 
+The standard recommends that umask permissions be set to 027 or higher. Currently this test only checks for 027, so a more restrictive umask such as 077 would fail. Further, it does not test the /etc/profile/*.sh files on the system.
+
+I will leave it this way until someone needs a more restrictive umask test - Just add an issue if this is you 👍
 
 ### Disclaimer:
 This is not a replacement for a full audit and a passing result from this script does not necessarily mean that you are compliant (but it should give you a good idea of where to start).  

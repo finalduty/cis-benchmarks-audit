@@ -1985,41 +1985,6 @@ test_5.2.10() {
 test_5.2.11() {
     id=$1
     level=$2
-    description="Ensure only approved ciphers are used"
-    scored="Scored"
-    test_start_time="$(test_start $id)"
-    
-    state=0
-    good_ciphers="aes256-ctr,aes192-ctr,aes128-ctr"
-    ciphers=$(awk '/^Ciphers / {print $2}' /etc/ssh/sshd_config | sed 's/,/ /g')
-    
-    ## Tests Start ##
-    for cipher in $ciphers; do
-        if [ $( echo "$good_ciphers" | grep -c "$cipher") -eq 1 ]; then
-            [ "$state" -eq 0 ] && state=1
-            write_debug "5.2.11 - $cipher is an approved cipher"
-        else
-            state=2
-            write_debug "5.2.11 - $cipher is NOT an approved cipher ($good_ciphers)"
-        fi
-    done
-    
-    case $state in
-        1 ) result="Pass";;
-        2 ) result="Fail";;
-        * ) result="Error"
-            write_debug "5.2.11 - Something went wrong" ;;
-    esac
-            
-    #[ $(egrep -c "^Ciphers\saes256-ctr,aes192-ctr,aes128-ctr$" /etc/ssh/sshd_config) -eq 1 ] && result="Pass"
-    ## Tests End ##
-    
-    duration="$(test_finish $id $test_start_time)ms"
-    write_result "$id,$description,$scored,$level,$result,$duration"
-}
-test_5.2.12() {
-    id=$1
-    level=$2
     description="Ensure only approved MAC algorithms are used"
     scored="Scored"
     test_start_time="$(test_start $id)"
@@ -2046,13 +2011,12 @@ test_5.2.12() {
             write_debug "5.2.11 - Something went wrong" ;;
     esac
 
-    #[ $(egrep -c "^MACs\shmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,umac-128@openssh.com$" /etc/ssh/sshd_config) -eq 1 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
     write_result "$id,$description,$scored,$level,$result,$duration"
 }
-test_5.2.13() {
+test_5.2.12() {
     id=$1
     level=$2
     description="Ensure SSH Idle Timeout Interval is configured"
@@ -2061,7 +2025,7 @@ test_5.2.13() {
     
     ## Tests Start ##
     if [ $(grep -c "^ClientAlive" /etc/ssh/sshd_config) -eq 2 ]; then
-        [ $(grep "^ClientAliveInterval" /etc/ssh/sshd_config | awk '{print $2}') -le 900 ] || state=1
+        [ $(grep "^ClientAliveInterval" /etc/ssh/sshd_config | awk '{print $2}') -le 300 ] || state=1
         [ $(grep "^ClientAliveCountMax" /etc/ssh/sshd_config | awk '{print $2}') -eq 0 ] || state=1
     else
         state=1
@@ -2072,7 +2036,7 @@ test_5.2.13() {
     duration="$(test_finish $id $test_start_time)ms"
     write_result "$id,$description,$scored,$level,$result,$duration"
 }
-test_5.2.14() {
+test_5.2.13() {
     id=$1
     level=$2
     description="Ensure SSH LoginGraceTime is set to one minute or less"
@@ -2090,7 +2054,7 @@ test_5.2.14() {
     duration="$(test_finish $id $test_start_time)ms"
     write_result "$id,$description,$scored,$level,$result,$duration"
 }
-test_5.2.16() {
+test_5.2.15() {
     id=$1
     level=$2
     description="Ensure SSH warning banner is configured"
@@ -2115,8 +2079,7 @@ test_5.3.1() {
     
     ## Tests Start ##
     ## Notes: Per the standard - Additional module options may be set, recommendation 
-    ## requirements only cover including try_first_pass and minlen set to 14 or more.
-        
+    ##   requirements only cover including try_first_pass and minlen set to 14 or more.
     [ "$(grep -c "^password\s+requisite\s+pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/password-auth)" -eq 1 ] || state=$(( $state + 1 ))
     [ "$(grep -c "^password\s+requisite\s+pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/system-auth)" -eq 1 ] || state=$(( $state + 2 ))
     [ "$(awk '/^(\s+)?minlen = / {print $3}' /etc/security/pwquality.conf)" -ge 14 ] || state=$(( $state + 4 ))
@@ -2137,15 +2100,31 @@ test_5.3.3() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-    for file in /etc/pam.d/password-auth /etc/pam.d/system-auth; do
-        if [ $(egrep -c "^password\s+sufficient\s+pam_unix.so.*remember=" $file) -eq 1 ]; then
-            [ "$(egrep "^password\s+sufficient\s+pam_unix.so" $file | sed -e 's/^.*remember=//' -e's/\s.*$//' )" -ge 5 ] || state=1
-        else
-            state=1
-        fi
-    done
+    state=1
     
-    [ $state -eq 0 ]&& result="Pass"
+    pwauth_history=$(egrep '^password\s+required\s+pam_pwhistory.so' /etc/pam.d/password-auth)
+    sysauth_history=$(egrep '^password\s+required\s+pam_pwhistory.so' /etc/pam.d/system-auth)
+    pwauth_unix=$(egrep '^password\s+sufficient\s+pam_unix.so' /etc/pam.d/password-auth)
+    sysauth_unix=$(egrep '^password\s+sufficient\s+pam_unix.so' /etc/pam.d/system-auth)
+    
+    pwauth_history_count=$(echo "$pwauth_history" | sed -e 's/.*remember=\([0-9]*\)/\1/')
+    sysauth_history_count=$(echo "$sysauth_history" | sed -e 's/.*remember=\([0-9]*\)/\1/')
+    pwauth_unix_count=$(echo "$pwauth_unix" | sed -e 's/.*remember=\([0-9]*\)/\1/')
+    sysauth_unix_count=$(echo "$sysauth_unix" | sed -e 's/.*remember=\([0-9]*\)/\1/')
+    
+    ## Use parameter expansion so that null values become 0 and don't break the tests
+    ## https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
+    pwauth_history_count=${pwauth_history_count:-0}
+    sysauth_history_count=${sysauth_history_count:-0}
+    pwauth_unix_count=${sysauth_unix_count:-0}
+    sysauth_unix_count=${sysauth_unix_count:-0}
+    
+    ## I couldn't be bothered handling null values, so used param expansion above 
+    ## so that null values became zeroes
+    [ $pwauth_history_count -ge 5 -a $sysauth_history_count -ge 5 ] && state=0
+    [ $pwauth_unix_count -ge 5 -a $sysauth_unix_count -ge 5 ] && state=0
+    
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -2269,6 +2248,30 @@ test_5.4.1.4() {
         fi
     done
     
+    [ $state -eq 0 ] && result="Pass"
+    ## Tests End ##
+    
+    duration="$(test_finish $id $test_start_time)ms"
+    write_result "$id,$description,$scored,$level,$result,$duration"
+}
+test_5.4.1.5() {
+    id=$1
+    level=$2
+    description="Ensure all users last password change date is in the past"
+    scored="Scored"
+    test_start_time="$(test_start $id)"
+    
+    ## Tests Start ##
+    state=0
+    
+    for user in $(cat /etc/shadow | cut -d: -f1); do 
+        change_date=$(chage --list $user | sed -n '/Last password change/ s/^.*: //p')
+        
+        if [ "$change_date" != 'never' ]; then
+            [ $(date +%s) -gt $(date -d "$change_date" +%s) ] || state=1
+        fi
+    done
+
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
@@ -3027,12 +3030,11 @@ if [ $(is_test_included 5; echo $?) -eq 0 ]; then   write_cache "5,Access Authen
         run_test 5.2.8 1 test_5.2.8   ## 5.2.8 Ensure root login is disabled (Scored)
         run_test 5.2.9 1 test_5.2.9   ## 5.2.9 Ensure PermitEmptyPasswords is disabled (Scored)
         run_test 5.2.10 1 test_5.2.10   ## 5.2.10 Ensure PermitUserEnvironment is disabled (Scored)
-        run_test 5.2.11 1 test_5.2.11   ## 5.2.11 Ensure only approved ciphers are used (Scored)
-        run_test 5.2.12 1 test_5.2.12   ## 5.2.12 Ensure only approved MAC algorithms are used (Scored)
-        run_test 5.2.13 1 test_5.2.13   ## 5.2.13 Ensure SSH Idle Timeout Interval is configured (Scored)
-        run_test 5.2.14 1 test_5.2.14   ## 5.2.14 Ensure SSH LoginGraceTime is set to one minute or less (Scored)
-        run_test 5.2.15 1 skip_test "Ensure SSH access is limited"   ## 5.2.15 Ensure (Scored)
-        run_test 5.2.16 1 test_5.2.16   ## 5.2.16 Ensure SSH warning banner is configured (Scored)
+        run_test 5.2.11 1 test_5.2.11   ## 5.2.11 Ensure only approved MAC algorithms are used (Scored)
+        run_test 5.2.12 1 test_5.2.12   ## 5.2.12 Ensure SSH Idle Timeout Interval is configured (Scored)
+        run_test 5.2.13 1 test_5.2.13   ## 5.2.13 Ensure SSH LoginGraceTime is set to one minute or less (Scored)
+        run_test 5.2.14 1 skip_test "Ensure SSH access is limited"   ## 5.2.15 Ensure (Scored)
+        run_test 5.2.15 1 test_5.2.15   ## 5.2.15 Ensure SSH warning banner is configured (Scored)
     fi
     if [ $(is_test_included 5.3; echo $?) -eq 0 ]; then   write_cache "5.3,Configure PAM"
         run_test 5.3.1 1 test_5.3.1   ## 5.3.1 Ensure password creation requirements are configured (Scored)
@@ -3046,6 +3048,7 @@ if [ $(is_test_included 5; echo $?) -eq 0 ]; then   write_cache "5,Access Authen
             run_test 5.4.1.2 1 test_5.4.1.2   ## 5.4.1.2 Ensure minimum days between password changes is 7 or more (Scored)
             run_test 5.4.1.3 1 test_5.4.1.3   ## 5.4.1.3 Ensure password expiration warning days is 7 or more (Scored)
             run_test 5.4.1.4 1 test_5.4.1.4   ## 5.4.1.4 Ensure inactive password lock is 30 days or less (Scored)
+            run_test 5.4.1.5 1 test_5.4.1.5   ## 5.4.1.5 Ensure all users last password change date is in the past (Scored)
         fi
         run_test 5.4.2 1 test_5.4.2   ## 5.4.2 Ensure system accounts are non-login (Scored)
         run_test 5.4.3 1 test_5.4.3   ## 5.4.2 Ensure default group for the root account is GID 0 (Scored)
