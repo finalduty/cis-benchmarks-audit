@@ -1193,7 +1193,8 @@ test_3.x-single() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        [ "$(sysctl net.$protocol.$sysctl)" == "net.$protocol.$sysctl = $val" ] && result="Pass"
+    [ "$(sysctl net.$protocol.$sysctl)" == "net.$protocol.$sysctl = $val" ] && result="Pass"
+    [ "$(grep "net.$protocol.$sysctl" /etc/sysctl.conf /etc/sysctl.d/*)" == "net.$protocol.$sysctl = $val" ] || state=1
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1210,9 +1211,13 @@ test_3.x-double() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        [ "$(sysctl net.$protocol.conf.all.$sysctl)" == "net.$protocol.conf.all.$sysctl = $val" ] || state=1
-        [ "$(sysctl net.$protocol.conf.default.$sysctl)" == "net.$protocol.conf.default.$sysctl = $val" ] || state=2
-        [ $state -eq 0 ] && result="Pass"
+    [ "$(sysctl net.$protocol.conf.all.$sysctl)" == "net.$protocol.conf.all.$sysctl = $val" ] || state=1
+    [ "$(grep "net.$protocol.conf.all.$sysctl" /etc/sysctl.conf /etc/sysctl.d/*)" == "net.$protocol.conf.all.$sysctl = $val" ] || state=2
+    
+    [ "$(sysctl net.$protocol.conf.default.$sysctl)" == "net.$protocol.conf.default.$sysctl = $val" ] || state=4
+    [ "$(grep "net.$protocol.conf.default.$sysctl" /etc/sysctl.conf /etc/sysctl.d/*)" == "net.$protocol.conf.default.$sysctl = $val" ] || state=8
+    
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1226,7 +1231,10 @@ test_3.3.3() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        [ $(modprobe -c | grep -c 'options ipv6 disable=1') -eq 1 ] && result="Pass"
+    state=1
+    [ $(modprobe -c | grep -c 'options ipv6 disable=1') -eq 1 ] && state=0
+    [ $(grep GRUB_CMDLINE_LINUX /etc/default/grub | grep ipv6.disable=1 &>/dev/null; echo $?) -eq 0 ] && state=0
+    [ $state -eq 0 ] && result="Passed"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1240,10 +1248,10 @@ test_3.4.1() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        [ $(rpm -q tcp_wrappers &>/dev/null; echo $? ) -eq 0 ] || state=1
-        [ $(rpm -q tcp_wrappers-libs &>/dev/null; echo $? ) -eq 0 ] || state=2
-        
-        [ $state -eq 0 ] && result="Pass"
+    [ $(rpm -q tcp_wrappers &>/dev/null; echo $? ) -eq 0 ] || state=1
+    [ $(rpm -q tcp_wrappers-libs &>/dev/null; echo $? ) -eq 0 ] || state=2
+    
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1257,7 +1265,7 @@ test_3.4.2() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        if [ -f /etc/hosts.deny ]; then
+    if [ -f /etc/hosts.deny ]; then
             [ "$(grep -c '^ALL:' /etc/hosts.deny)" -gt 0 ] && result="Pass"
         fi
     ## Tests End ##
@@ -1273,9 +1281,9 @@ test_3.4.3() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        if [ -f /etc/hosts.deny ]; then
-            [ "$(tail -1 /etc/hosts.deny)" == "ALL: ALL" ] && result="Pass"
-        fi
+    if [ -f /etc/hosts.deny ]; then
+        [ "$(tail -1 /etc/hosts.deny)" == "ALL: ALL" ] && result="Pass"
+    fi
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1290,13 +1298,13 @@ test_3.4.x() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        state=0
-        str=$(ls -l $file)
-        
-        [ $(echo $str | awk '{print $1}') == "-rw-r--r--." ] || state=1
-        [ $(echo $str | awk '{print $3}') == "root" ] || state=1
-        [ $(echo $str | awk '{print $4}') == "root" ] || state=1
-        [ $state -eq 0 ] && result="Pass"
+    state=0
+    str=$(ls -l $file)
+    
+    [ $(echo $str | awk '{print $1}') == "-rw-r--r--." ] || state=1
+    [ $(echo $str | awk '{print $3}') == "root" ] || state=1
+    [ $(echo $str | awk '{print $4}') == "root" ] || state=1
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1312,9 +1320,9 @@ test_3.5.x() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        [ $(diff -qsZ <(modprobe -n -v $protocol 2>/dev/null | tail -1) <(echo "install /bin/true") &>/dev/null; echo $?) -ne 0 ] && state=1
-        [ $(lsmod | grep $protocol | wc -l) -ne 0 ] && state=2
-        [ $state -eq 0 ] && result="Pass"
+    [ $(diff -qsZ <(modprobe -n -v $protocol 2>/dev/null | tail -1) <(echo "install /bin/true") &>/dev/null; echo $?) -ne 0 ] && state=1
+    [ $(lsmod | grep $protocol | wc -l) -ne 0 ] && state=2
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1328,11 +1336,11 @@ test_3.6.2() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        str=$(iptables -S -w60)
-        [ $(echo "$str" | grep -c -- "-P INPUT DROP") != 0 ] || state=1
-        [ $(echo "$str" | grep -c -- "-P FORWARD DROP") != 0 ] || state=2
-        [ $(echo "$str" | grep -c -- "-P OUTPUT DROP") != 0 ] || state=4
-        [ $state -eq 0 ] && result="Pass"
+    str=$(iptables -S -w60)
+    [ $(echo "$str" | grep -c -- "-P INPUT DROP") != 0 ] || state=1
+    [ $(echo "$str" | grep -c -- "-P FORWARD DROP") != 0 ] || state=2
+    [ $(echo "$str" | grep -c -- "-P OUTPUT DROP") != 0 ] || state=4
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1347,15 +1355,15 @@ test_3.6.3() {
     state=0
     
     ## Tests Start ##
-        str=$(iptables -S -w60)
-        [ $(echo "$str" | grep -c -- "-A INPUT -i lo -j ACCEPT") != 0 ] || state=$(( $state + 1 ))
-        [ $(echo "$str" | grep -c -- "-A OUTPUT -o lo -j ACCEPT") != 0 ] || state=$(( $state + 2 ))
-        
-        ## This check differs slightly from that specified in the standard. 
-        ## I personally believe it's safer to specify that the rule is not on the loopback interface
-        [ $(echo "$str" | egrep -c -- "-A INPUT -s 127\.0\.0\.0\/8(\s! -i lo)? -j (LOG_)?DROP") != 0 ] || state=$(( $state + 4 ))
-        
-        [ $state -eq 0 ] && result="Pass"
+    str=$(iptables -S -w60)
+    [ $(echo "$str" | grep -c -- "-A INPUT -i lo -j ACCEPT") != 0 ] || state=$(( $state + 1 ))
+    [ $(echo "$str" | grep -c -- "-A OUTPUT -o lo -j ACCEPT") != 0 ] || state=$(( $state + 2 ))
+    
+    ## This check differs slightly from that specified in the standard. 
+    ## I personally believe it's safer to specify that the rule is not on the loopback interface
+    [ $(echo "$str" | egrep -c -- "-A INPUT -s 127\.0\.0\.0\/8(\s! -i lo)? -j (LOG_)?DROP") != 0 ] || state=$(( $state + 4 ))
+    
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1369,10 +1377,10 @@ test_3.6.4() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-        str=$(iptables -S -w60)
-        [ $(echo "$str" | grep -c -- "-A INPUT -m state --state ESTABLISHED -j ACCEPT") != 0 ] || state=1
-        [ $(echo "$str" | grep -c -- "-A OUTPUT -m state --state RELATED,ESTABLISHED -j ACCEPT") != 0 ] || state=2
-        [ $state -eq 0 ] && result="Pass"
+    str=$(iptables -S -w60)
+    [ $(echo "$str" | grep -c -- "-A INPUT -m state --state ESTABLISHED -j ACCEPT") != 0 ] || state=1
+    [ $(echo "$str" | grep -c -- "-A OUTPUT -m state --state RELATED,ESTABLISHED -j ACCEPT") != 0 ] || state=2
+    [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
