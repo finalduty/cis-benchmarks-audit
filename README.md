@@ -1,15 +1,15 @@
 # CIS Benchmarks Audit
 
-This repo contains a bash script which performs tests against your CentOS system to give an indication of whether the running server may compliy with the CIS Benchmarks. https://learn.cisecurity.org/benchmarks
+This repo contains a bash script which performs tests against your CentOS system to give an indication of whether the running server may compliy with the CIS v2.2.0 Benchmarks for CentOS. https://learn.cisecurity.org/benchmarks
 
-_Please note that only CentOS 7 is supported at this time._
+_Only CentOS 7 is supported at this time._
 
-### How do I use this script?
-Download:
+### How do I use this?
+#### Download:
 
     curl -LO https://raw.githubusercontent.com/finalduty/cis_benchmarks_audit/master/cis-audit.sh && chmod 750 cis-audit.sh
 
-Run: 
+#### Run: 
 ```
 # ./cis-audit.sh --help
 This script runs tests on the system to check for compliance against the CIS CentOS 7 Benchmarks.
@@ -91,18 +91,16 @@ The output from `auditctl -l` actually shows:
 -a always,exit -F arch=b32 -S stime,settimeofday,adjtimex -F key=time-change
 ```
 
-####Test 4.1.8 & 4.1.9
+#### Test 4.1.8 & 4.1.9
 The way the v2.2.0 standard lists the requirements to pass `4.1.8` and `4.1.9` conflicts with each other when looking at the 'logins' terms used.
 
 This tool deviates from the standard here and includes the 'logins' portions of `4.1.9` in `4.1.8` instead. It is anticipated that users going for compliance against these two recommendations would do so at the same time and should not notice any difference between the implementation and the standard.
 
-#### Disclaimer:
+### Disclaimer:
 This is not a replacement for a full audit and a passing result from this script does not necessarily mean that you are compliant (but it should give you a good idea of where to start).  
 
 The script will never make changes to your system, but it will write temporary data to to /tmp/.cis-audit* (which is cleaned up afterwards).  
 
 This script can run multiple tests at a time and it is possible that some tests could have an adverse impact on your system(s). There is an adjustable limit for the number of concurrent tests as well as a nicing argument which can help keep load down.  
-
-It is recommended that you **do not run this on a production server** at this time.  
 
 _No warranty is offered and no responsibility will be taken for damage to systems resulting from the use of this script._
