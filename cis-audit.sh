@@ -939,18 +939,18 @@ test_2.1.x() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        str=$(chkconfig --list 2>&1)
-        state=0
-        
-        dgram="$(chkconfig --list $service-dgram 2>/dev/null | awk '{print $2}')"
-        stream="$(chkconfig --list $service-stream 2>/dev/null | awk '{print $2}')"
-
-        if [ "$dgram" != "" -o "$stream" != "" ]; then
-            [ "$dgram" != "off" ] && state=1
-            [ "$stream" != "off" ] && state=1
-        fi
+    str=$(chkconfig --list 2>&1)
+    state=0
     
-        [ $state -eq 0 ] && result=Pass
+    dgram="$(chkconfig --list $service-dgram 2>/dev/null | awk '{print $2}')"
+    stream="$(chkconfig --list $service-stream 2>/dev/null | awk '{print $2}')"
+
+    if [ "$dgram" != "" -o "$stream" != "" ]; then
+        [ "$dgram" != "off" ] && state=1
+        [ "$stream" != "off" ] && state=1
+    fi
+
+    [ $state -eq 0 ] && result=Pass
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1002,7 +1002,7 @@ test_2.2.1.1() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        [ $(rpm -q ntp &>/dev/null; echo $?) -eq 0 -o $(rpm -q chrony &>/dev/null; echo $?) -eq 0 ] && result="Pass"
+    [ $(rpm -q ntp &>/dev/null; echo $?) -eq 0 -o $(rpm -q chrony &>/dev/null; echo $?) -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1070,7 +1070,7 @@ test_2.2.2() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        [ $(rpm -qa xorg-x11* &>/dev/null | wc -l) -eq 0 ] && result="Pass"
+    [ $(rpm -qa xorg-x11* &>/dev/null | wc -l) -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1173,7 +1173,7 @@ test_2.3.x() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        [ $(rpm -q $pkg &>/dev/null; echo $?) -eq 1 ] && result="Pass"
+    [ $(rpm -q $pkg &>/dev/null; echo $?) -eq 1 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
