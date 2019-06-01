@@ -736,7 +736,7 @@ test_1.6.1.1() {
     ## Tests Start ##
     state=0
 
-    [ $(grep "^\s*linux" /boot/grub2/grub.cfg | egrep 'selinux=0|enforcing=0' | wc -l) -eq 0 ] || state=1
+    [ $(grep "^\s+linux" /boot/grub2/grub.cfg | egrep 'selinux=0|enforcing=0' | wc -l) -eq 0 ] || state=1
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
@@ -1233,7 +1233,11 @@ test_3.3.3() {
     ## Tests Start ##
     state=1
     [ $(modprobe -c | grep -c 'options ipv6 disable=1') -eq 1 ] && state=0
-    [ $(grep GRUB_CMDLINE_LINUX /etc/default/grub | grep ipv6.disable=1 &>/dev/null; echo $?) -eq 0 ] && state=0
+
+    linux_lines=$(grep -c "\s+linux" /boot/grub2/grub.cfg)
+    audit_lines=$(grep -c "\s+linux.*ipv6.disable=1" /boot/grub2/grub.cfg)
+    [ $linux_lines -eq $audit_lines ] && state=0
+
     [ $state -eq 0 ] && result="Passed"
     ## Tests End ##
     
@@ -1457,8 +1461,8 @@ test_4.1.3() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-    linux_lines=$(grep -c "\slinux" /boot/grub2/grub.cfg)
-    audit_lines=$(grep -c "\slinux.*audit=1" /boot/grub2/grub.cfg)
+    linux_lines=$(grep -c "\s+linux" /boot/grub2/grub.cfg)
+    audit_lines=$(grep -c "\s+linux.*audit=1" /boot/grub2/grub.cfg)
     [ $linux_lines -eq $audit_lines ] && result="Pass"
     ## Tests End ##
     
@@ -1480,7 +1484,7 @@ test_4.1.4() {
         -a always,exit -F arch=b32 -S clock_settime -F key=time-change\n
         -w /etc/localtime -p wa -k time-change'
         
-    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1501,7 +1505,7 @@ test_4.1.5() {
         -w /etc/shadow -p wa -k identity\n
         -w /etc/security/opasswd -p wa -k identity'
         
-    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1528,7 +1532,7 @@ test_4.1.6() {
         -w /etc/sysconfig/network -p wa -k system-locale\n
         -w /etc/sysconfig/network-scripts -p wa -k system-locale'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1546,7 +1550,7 @@ test_4.1.7() {
     expected='-w /etc/selinux -p wa -k MAC-policy\n
         -w /usr/share/selinux -p wa -k MAC-policy'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1566,7 +1570,7 @@ test_4.1.8() {
         -w /var/log/wtmp -p wa -k logins\n
         -w /var/log/btmp -p wa -k logins'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1583,7 +1587,7 @@ test_4.1.9() {
     search_term="session"
     expected='-w /var/run/utmp -p wa -k session'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1605,7 +1609,7 @@ test_4.1.10() {
         -a always,exit -F arch=b64 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=-1 -F key=perm_mod\n
         -a always,exit -F arch=b32 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=-1 -F key=perm_mod'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1625,7 +1629,7 @@ test_4.1.11() {
         -a always,exit -F arch=b64 -S open,truncate,ftruncate,creat,openat -F exit=-EPERM -F auid>=1000 -F auid!=-1 -F key=access\n
         -a always,exit -F arch=b32 -S open,creat,truncate,ftruncate,openat -F exit=-EPERM -F auid>=1000 -F auid!=-1 -F key=access'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1643,7 +1647,7 @@ test_4.1.13() {
     expected='-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=-1 -F key=mounts\n
         -a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=-1 -F key=mounts'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1661,7 +1665,7 @@ test_4.1.14() {
     expected='-a always,exit -F arch=b64 -S rename,unlink,unlinkat,renameat -F auid>=1000 -F auid!=-1 -F key=delete\n
         -a always,exit -F arch=b32 -S unlink,rename,unlinkat,renameat -F auid>=1000 -F auid!=-1 -F key=delete'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1679,7 +1683,7 @@ test_4.1.15() {
     expected='-w /etc/sudoers -p wa -k scope\n
         -w /etc/sudoers.d -p wa -k scope'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1696,7 +1700,7 @@ test_4.1.16() {
     search_term="actions"
     expected='-w /var/log/sudo.log -p wa -k actions'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1716,7 +1720,7 @@ test_4.1.17() {
         -w /sbin/modprobe -p x -k modules\n
         -a always,exit -F arch=b64 -S init_module,delete_module -F key=modules'
     
-    diff <(echo -e $expected | sed 's/^\s*//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
+    diff <(echo -e $expected | sed 's/^\s+//') <(auditctl -l | grep $search_term) &>/dev/null && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1745,7 +1749,7 @@ test_4.2.1.3() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-    [ $(egrep -c '^\$FileCreateMode\s.?640' /etc/rsyslog.conf) -gt 0 ] && result="Pass"
+    [ $(egrep -c '^\$FileCreateMode\s+0?640' /etc/rsyslog.conf) -gt 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1805,7 +1809,7 @@ test_4.2.3() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-        [ $(rpm -q rsyslog &>/dev/null; echo $?) -eq 0 -o $(rpm -q syslog-ng &>/dev/null; echo $?) -eq 0 ] && result="Pass"
+    [ $(rpm -q rsyslog &>/dev/null; echo $?) -eq 0 -o $(rpm -q syslog-ng &>/dev/null; echo $?) -eq 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -2113,9 +2117,9 @@ test_5.3.1() {
     ## Notes: Per the standard - Additional module options may be set, recommendation 
     ## requirements only cover including try_first_pass and minlen set to 14 or more.
         
-    [ "$(grep -c "^password\s*requisite\s*pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/password-auth)" -eq 1 ] || state=$(( $state + 1 ))
-    [ "$(grep -c "^password\s*requisite\s*pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/system-auth)" -eq 1 ] || state=$(( $state + 2 ))
-    [ "$(awk '/^(\s*)?minlen = / {print $3}' /etc/security/pwquality.conf)" -ge 14 ] || state=$(( $state + 4 ))
+    [ "$(grep -c "^password\s+requisite\s+pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/password-auth)" -eq 1 ] || state=$(( $state + 1 ))
+    [ "$(grep -c "^password\s+requisite\s+pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/system-auth)" -eq 1 ] || state=$(( $state + 2 ))
+    [ "$(awk '/^(\s+)?minlen = / {print $3}' /etc/security/pwquality.conf)" -ge 14 ] || state=$(( $state + 4 ))
 
     [ $state -eq 0 ]&& result="Pass"
     write_debug "Test $id finished with end state of $state"
