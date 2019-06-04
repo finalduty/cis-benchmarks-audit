@@ -2416,7 +2416,7 @@ test_6.1.12() {
     id=$1
     level=$2
     description="Ensure no ungrouped files or directories exist"
-    scored="Not Scored"
+    scored="Scored"
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
