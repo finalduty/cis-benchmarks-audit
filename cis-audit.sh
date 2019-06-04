@@ -1751,7 +1751,7 @@ test_4.1.18() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-    [ "$(auditctl -l | tail -1)" == "-e 2" ] && result="Pass"
+    [ "$(grep "^\s*[^#]" /etc/audit/audit.rules | tail -n1 | sed 's/^\s*//')" == "-e 2" ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
