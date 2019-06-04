@@ -2255,14 +2255,26 @@ test_5.4.1.4() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-    file="/etc/login.defs"
-    days=30
+    max_days=30
+    max_seconds=$(( $max_days * 24 * 60 * 60 ))
     
-    [ $(useradd -D | grep INACTIVE | sed 's/^.*=//') -gt 0 -a $(useradd -D | grep INACTIVE | sed 's/^.*=//') -le $days ] || state=1
+    [ $(useradd -D | grep INACTIVE | sed 's/^.*=//') -gt 0 -a $(useradd -D | grep INACTIVE | sed 's/^.*=//') -le $max_days ] || state=1
     
     for i in $(egrep ^[^:]+:[^\!*] /etc/shadow | cut -d: -f1); do 
-        if [ $(chage --list $i 2>/dev/null | awk '/inactive/ {print $4}') != "never" ]; then
-            [ $(chage --list $i 2>/dev/null | awk '/inactive/ {print $4}') -le $days ] || state=1
+        [ $(chage --list $i 2>/dev/null | awk '/Password expires/ {print $4}') != "never" ] && does_password_expire=True || does_password_expire=False
+        [ $(chage --list $i 2>/dev/null | awk '/Password inactive/ {print $4}') != "never" ] && does_password_inactive=True || does_password_inactive=False
+
+        if [ "$does_password_expire" == 'True' -a "$does_password_inactive" == 'True' ]; then
+            password_expires=$(chage --list $i | sed -n '/Password expires/ s/^.*: //p')
+            password_inactive=$(chage --list $i | sed -n '/Password inactive/ s/^.*: //p')
+            
+            expires_time=$(date +%s -d "$password_expires")
+            inactive_time=$(date +%s -d "$password_inactive")
+            
+            time_difference=$(( $inactive_time - $expires_time ))
+            
+            [ $time_difference -gt $max_seconds ] && state=1
+            
         else
             state=1
         fi
