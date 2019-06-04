@@ -2097,9 +2097,12 @@ test_5.3.1() {
     ## Tests Start ##
     ## Notes: Per the standard - Additional module options may be set, recommendation 
     ##   requirements only cover including try_first_pass and minlen set to 14 or more.
-    [ "$(grep -c "^password\s+requisite\s+pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/password-auth)" -eq 1 ] || state=$(( $state + 1 ))
-    [ "$(grep -c "^password\s+requisite\s+pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/system-auth)" -eq 1 ] || state=$(( $state + 2 ))
-    [ "$(awk '/^(\s+)?minlen = / {print $3}' /etc/security/pwquality.conf)" -ge 14 ] || state=$(( $state + 4 ))
+    [ "$(egrep -c "^password\s+requisite\s+pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/password-auth)" -eq 1 ] || state=$(( $state + 1 ))
+    [ "$(egrep -c "^password\s+requisite\s+pam_pwquality.so.*try_first_pass.*retry=3" /etc/pam.d/system-auth)" -eq 1 ] || state=$(( $state + 2 ))
+
+    minlen="$(awk '/^(\s+)?minlen = / {print $3}' /etc/security/pwquality.conf)"
+    minlen=${minlen:=0}
+    [ "$minlen" -ge 14 ] || state=$(( $state + 4 ))
 
     [ $state -eq 0 ]&& result="Pass"
     write_debug "Test $id finished with end state of $state"
