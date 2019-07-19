@@ -510,7 +510,7 @@ test_1.1.x-check_fs_opts() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-    mount | egrep "$partition .*,$fs_opt," &>/dev/null  && result="Pass"
+    mount | egrep "$partition .*$fs_opt" &>/dev/null  && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
