@@ -1,5 +1,5 @@
 #!/bin/bash
-## [rev: b71db1d]
+## [rev: b71db33]
 
 ##
 ## Copyright 2019 Andy Dustin
@@ -293,12 +293,12 @@ run_test() {
         ## Don't try to thread the script if trace or debug is enabled so it's output is tidier :)
         if [ $trace == "True" ]; then
             $test $id $level $args
-
+            
         elif [ $debug == "True" ]; then
             set -x
             $test $id $level $args
             set +x
-
+            
         else
             $test $id $level $args &
         fi
@@ -2363,7 +2363,7 @@ test_5.6() {
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
-    [ $(grep -c "^auth required pam_wheel.so use_uid" /etc/pam.d/su) -eq 1 ] || state=1
+    [ $(egrep -c "^auth\s+required\s+pam_wheel.so\s+use_uid" /etc/pam.d/su) -eq 1 ] || state=1
     
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
