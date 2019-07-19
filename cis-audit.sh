@@ -1,4 +1,5 @@
 #!/bin/bash
+## [rev: b71db1d]
 
 ##
 ## Copyright 2019 Andy Dustin
@@ -18,15 +19,6 @@
 ## multiple tests to be run in parallel, reducing execution time.
 
 ## You can obtain a copy of the CIS Benchmarks from https://www.cisecurity.org/cis-benchmarks/
-
-## andy.dustin@gmail.com [rev: a44ceb7]: First Release
-## andy.dustin@gmail.com [rev: ad63750]: Improved progress ticker display logic 
-## andy.dustin@gmail.com [rev: ad80cd7]: Updated state tracking on some tests incorrectly failing
-## andy.dustin@gmail.com [rev: ae68d08]: User reported UX issue - Now includes both level 1 and level 2 tests when called with both '--level 1' and '--level 2' arguments. Thanks Darren Foster
-## andy.dustin@gmail.com [rev: ae700df]: Fixed output for tests that are skipped using the 'skip_test' function
-## andy.dustin@gmail.com [rev: ae700e9]: Updated test 6.2.8 to use `stat` instead of `ls`
-## andy.dustin@gmail.com [rev: ae70116]: Updated tests 5.2.11 and 5.2.12 to support a wider range of configurations of approved Ciphers and MACs in sshd_config. Also added error state for tests. Thanks Darren Foster
-
 
 
 ### Variables ###
@@ -298,9 +290,15 @@ run_test() {
         
         write_debug "There were $(( $(pgrep -P $$ 2>&1 | wc -l) - 1 ))/$max_running_tests max_running_tasks when starting test $id."
         
-        ## Don't try to thread script if trace is enabled so it's output is tidier :)
+        ## Don't try to thread the script if trace or debug is enabled so it's output is tidier :)
         if [ $trace == "True" ]; then
             $test $id $level $args
+
+        elif [ $debug == "True" ]; then
+            set -x
+            $test $id $level $args
+            set +x
+
         else
             $test $id $level $args &
         fi
@@ -2122,10 +2120,10 @@ test_5.3.3() {
     ## Tests Start ##
     state=1
     
-    pwauth_history=$(egrep '^password\s+required\s+pam_pwhistory.so' /etc/pam.d/password-auth)
-    sysauth_history=$(egrep '^password\s+required\s+pam_pwhistory.so' /etc/pam.d/system-auth)
-    pwauth_unix=$(egrep '^password\s+sufficient\s+pam_unix.so' /etc/pam.d/password-auth)
-    sysauth_unix=$(egrep '^password\s+sufficient\s+pam_unix.so' /etc/pam.d/system-auth)
+    pwauth_history=$(egrep '^password\s+required\s+pam_pwhistory.so.*remember' /etc/pam.d/password-auth)
+    sysauth_history=$(egrep '^password\s+required\s+pam_pwhistory.so.*remember' /etc/pam.d/system-auth)
+    pwauth_unix=$(egrep '^password\s+sufficient\s+pam_unix.so.*remember' /etc/pam.d/password-auth)
+    sysauth_unix=$(egrep '^password\s+sufficient\s+pam_unix.so.*remember' /etc/pam.d/system-auth)
     
     pwauth_history_count=$(echo "$pwauth_history" | sed -e 's/.*remember=\([0-9]*\)/\1/')
     sysauth_history_count=$(echo "$sysauth_history" | sed -e 's/.*remember=\([0-9]*\)/\1/')
