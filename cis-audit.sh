@@ -583,7 +583,7 @@ test_1.2.1() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-    repolist=$(yum repolist 2>/dev/null)
+    repolist=$(timeout 30 yum repolist 2>/dev/null)
     [ $(echo "$repolist" | egrep -c '^base/7/') -ne 0 -a $(echo "$repolist" | egrep -c '^updates/7/') -ne 0 ] && result="Pass"
     ## Tests End
     
