@@ -913,7 +913,7 @@ test_1.7.2() {
     
     if [ "$(rpm -q gdm)" != "package gdm is not installed" ]; then
         if [ -f $file ]; then
-            diff -qs $file <( echo -e "user-db:user\nsystem-db:gdm\nfile-db:/usr/share/gdm/greeter-dconf-defaults\n") || state=1
+            diff -qs $gdm_file <( echo -e "user-db:user\nsystem-db:gdm\nfile-db:/usr/share/gdm/greeter-dconf-defaults\n") || state=1
         else
             state=2
         fi
