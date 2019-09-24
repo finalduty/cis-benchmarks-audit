@@ -1859,8 +1859,8 @@ test_5.1.8() {
     [ -f /etc/at.deny ] && state=$(( $state + 1 ))
     [ -f /etc/cron.deny ] && state=$(( $state + 2 ))
     if [ -f /etc/at.allow -a -f /etc/cron.allow ]; then
-        [ $(ls -l /etc/at.allow 2>/dev/null | awk '{ print $1" "$3" "$4 }' | grep -c -- "-rw-------. root root") -eq 1 ] || state=$(( $state + 4 ))
-        [ $(ls -l /etc/cron.allow 2>/dev/null | awk '{ print $1" "$3" "$4 }' | grep -c -- "-rw-------. root root") -eq 1 ] || state=$(( $state + 8 ))
+        [ "$(stat /etc/at.allow 2>/dev/null| grep -m1 ^Access:)" == 'Access: (0600/-rw-------)  Uid: (    0/    root)   Gid: (    0/    root)' ] || state=$(( $state + 4 ))
+        [ "$(stat /etc/cron.allow 2>/dev/null| grep -m1 ^Access:)" == 'Access: (0600/-rw-------)  Uid: (    0/    root)   Gid: (    0/    root)' ] || state=$(( $state + 8 ))
     else
         state=$(( $state + 16 ))
     fi
