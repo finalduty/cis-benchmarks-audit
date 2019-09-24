@@ -786,7 +786,7 @@ test_1.6.1.3() {
     ## Tests Start ##
     state=0
     
-    [ "$(grep SELINUXTYPE=targeted /etc/selinux/config)" == "SELINUXTYPE=targeted" ] || state=1
+    [ "$(egrep -c ^SELINUXTYPE=targeted /etc/selinux/config)" -eq 1 ] || state=1
     [ "$(sestatus | awk '/Loaded policy name/ {print $4}')" == "targeted" ] || state=1
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
