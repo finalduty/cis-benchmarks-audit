@@ -26,13 +26,10 @@ No changes are made to system files by this script.
 
   Examples:
   
-    Run with debug enabled:
-      cis-audit.sh --debug
-      
     Exclude tests from section 1.1 and 1.3.2:
       cis-audit.sh --exclude "1.1 1.3.2"
       
-    Include tests only from section 4.1 but exclude tests from section 4.1.1:
+    Include tests only from section 4.1 but exclude tests from subsection 4.1.1:
       cis-audit.sh --include 4.1 --exclude 4.1.1
     
     Run only level 1 tests
@@ -41,6 +38,12 @@ No changes are made to system files by this script.
     Run level 1 tests and include some but not all SELinux questions
       cis-audit.sh --level 1 --include 1.6 --exclude 1.6.1.2
 
+    Email output to email@example.com
+      cis-audit.sh --level 1 | mail -s "CIS Audit Report on $HOSTNAME" email@example.com
+      
+    Display only Failed tests
+      cis-audit.sh --level 1 | grep Fail
+
 ```
 
 ### Example Results
@@ -48,7 +51,7 @@ No changes are made to system files by this script.
 # ./cis-audit.sh --include 5.2
 [00:00:01] (✓) 14 of 14 tests completed 
 
- CIS CentOS 7 Benchmark v2.1.1 Results 
+ CIS CentOS 7 Benchmark v2.2.0 Results 
 ---------------------------------------
 ID      Description                                                Scoring  Level  Result  Duration
 --      -----------                                                -------  -----  ------  --------
@@ -77,13 +80,29 @@ Passed 13 of 15 tests in 1 seconds (1 Skipped, 0 Errors)
 
 ### Notes / Caveats
 #### Test 3.7
-_Ensure wireless interfaces are disabled (Not Scored)_
-This test deviates from the benchmark's audit steps. The assumption here is that if you are on a server then you shouldn't have the wireless-tools installed for you to even use wireless interfaces and if you're on a laptop, you almost certainly want wireless access nowadays.
+> _3.7 - Ensure wireless interfaces are disabled (Not Scored)_  
+
+This test deviates from the audit steps specified in the standard. The assumption here is that if you are on a server then you shouldn't have the `wireless-tools` package installed so you wouldn't even be able to use any wireless interfaces, and if you're on a laptop, you almost certainly do want wireless access.
 
 #### Tests 4.1.4 to 4.1.17
+> _4.1.4 - Ensure events that modify date and time information are collected (Scored)_  
+> _4.1.5 - Ensure events that modify user/group information are collected (Scored)_  
+> _4.1.6 - Ensure events that modify the system's network environment are collected (Scored)_  
+> _4.1.7 - Ensure events that modify the system's Mandatory Access Controls are collected (Scored)_  
+> _4.1.8 - Ensure login and logout events are collected (Scored)_  
+> _4.1.9 - Ensure session initiation information is collected (Scored)_  
+> _4.1.10 - Ensure discretionary access control permission modification events are collected (Scored)_  
+> _4.1.11 - Ensure unsuccessful unauthorized file access attempts are collected (Scored)_  
+> _4.1.12 - Ensure use of privileged commands is collected (Scored)_  
+> _4.1.13 - Ensure successful file system mounts are collected (Scored)_  
+> _4.1.14 - Ensure file deletion events by users are collected (Scored)_  
+> _4.1.15 - Ensure changes to system administration scope (sudoers) is collected (Scored)_  
+> _4.1.16 - Ensure system administrator actions (sudolog) are collected (Scored)_  
+> _4.1.17 - Ensure kernel module loading and unloading is collected (Scored)_  
+
 The way that the tests are described in v2.2.0 of the standard do not directly reflect what is returned when querying the system. As such, the 'expected' output for these tests differs slightly to what is defined in the standard.
 
-Users will find that when applying recommended configurations per the standard, that the verify command displays it slightly differently. For instance, in in `4.1.4`, when applying the recommendations as below:
+Users will find that when applying the recommended configurations per the standard, that the verify command displays it slightly differently. For instance, in `4.1.4`, when applying the recommendations as below:
 ```
 -a always,exit -F arch=b32 -S adjtimex -S settimeofday -S stime -k time-change
 -a always,exit -F arch=b32 -S clock_settime -k time-change
@@ -96,9 +115,12 @@ The output from `auditctl -l` actually shows:
 ```
 
 #### Tests 4.1.8 & 4.1.9
+> _4.1.8 - Ensure login and logout events are collected (Scored)_  
+> _4.1.9 - Ensure session initiation information is collected (Scored)_  
+
 The way the v2.2.0 standard lists the requirements to pass `4.1.8` and `4.1.9` conflicts with each other when looking at the 'logins' terms used.
 
-This tool deviates from the standard here and includes the 'logins' portions of `4.1.9` in `4.1.8` instead. It is anticipated that users going for compliance against these two recommendations would do so at the same time and should not notice any difference between the implementation and the standard.
+This tool deviates from the standard here and includes the 'logins' portions of `4.1.9` in the tests for `4.1.8` instead of the ones specified in the standard. It is anticipated that users going for compliance against these two recommendations would do so at the same time and therefore should not notice any difference between the test results and the standard.
 
 #### Test 5.4.1.1
 In v2.1.1 of the benchmarks, the max password age was set to 90 days. In v2.2.0, the max age was set to 365 days. Whilst this script has been updated to be in line with v2.2.0, this test has been held back at the v2.1.1 value of 90 days.
