@@ -2169,13 +2169,13 @@ test_5.3.4() {
 test_5.4.1.1() {
     id=$1
     level=$2
-    description="Ensure password expiration is 90 days or less"
+    description="Ensure password expiration is 365 days or less"
     scored="Scored"
     test_start_time="$(test_start $id)"
     
     ## Tests Start ##
     file="/etc/login.defs"
-    days=90
+    days=365
     if [ -s $file ]; then
         if [ $(grep -c "^PASS_MAX_DAYS" $file) -eq 1 ]; then
             [ $(awk '/^PASS_MAX_DAYS/ {print $2}' $file) -le $days ] || state=1

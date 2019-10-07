@@ -122,9 +122,6 @@ The way the v2.2.0 standard lists the requirements to pass `4.1.8` and `4.1.9` c
 
 This tool deviates from the standard here and includes the 'logins' portions of `4.1.9` in the tests for `4.1.8` instead of the ones specified in the standard. It is anticipated that users going for compliance against these two recommendations would do so at the same time and therefore should not notice any difference between the test results and the standard.
 
-#### Test 5.4.1.1
-In v2.1.1 of the benchmarks, the max password age was set to 90 days. In v2.2.0, the max age was set to 365 days. Whilst this script has been updated to be in line with v2.2.0, this test has been held back at the v2.1.1 value of 90 days.
-
 #### Test 5.4.4 
 The standard recommends that umask permissions be set to 027 or higher. Currently this test only checks for 027, so a more restrictive umask such as 077 would fail. Further, it does not test the /etc/profile/*.sh files on the system.
 
