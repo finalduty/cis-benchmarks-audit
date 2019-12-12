@@ -445,6 +445,9 @@ test_perms() {
     scored="Scored"
     test_start_time=$(test_start $id)
     
+    # resolve links before testing since underlying file permissions are what's important not the link (typically 777)
+    file=$(readlink $file || echo $file)
+
     ## Tests Start ##
     u=$(echo $perms | cut -c1)
     g=$(echo $perms | cut -c2)
@@ -582,7 +585,7 @@ test_1.2.1() {
     
     ## Tests Start ##
     repolist=$(timeout 30 yum repolist 2>/dev/null)
-    [ $(echo "$repolist" | egrep -c '^base/7/') -ne 0 -a $(echo "$repolist" | egrep -c '^updates/7/') -ne 0 ] && result="Pass"
+    [ $(echo "$repolist" | grep '^repolist' | tr -d ',' | awk '{print $2}') -gt 0 ] && result="Pass"
     ## Tests End
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1375,12 +1378,12 @@ test_3.6.3() {
     
     ## Tests Start ##
     str=$(iptables -S -w60)
-    [ $(echo "$str" | grep -c -- "-A INPUT -i lo -j ACCEPT") != 0 ] || state=$(( $state + 1 ))
-    [ $(echo "$str" | grep -c -- "-A OUTPUT -o lo -j ACCEPT") != 0 ] || state=$(( $state + 2 ))
+    [ $(echo "$str" | grep -c -- "-A INPUT -i lo.*-j ACCEPT") != 0 ] || state=$(( $state + 1 ))
+    [ $(echo "$str" | grep -c -- "-A OUTPUT -o lo.*-j ACCEPT") != 0 ] || state=$(( $state + 2 ))
     
     ## This check differs slightly from that specified in the standard. 
     ## I personally believe it's safer to specify that the rule is not on the loopback interface
-    [ $(echo "$str" | egrep -c -- "-A INPUT -s 127\.0\.0\.0\/8(\s! -i lo)? -j (LOG_)?DROP") != 0 ] || state=$(( $state + 4 ))
+    [ $(echo "$str" | egrep -c -- "-A INPUT -s 127\.0\.0\.0\/8(\s! -i lo)?.*-j (LOG_)?DROP") != 0 ] || state=$(( $state + 4 ))
     
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
@@ -1397,8 +1400,8 @@ test_3.6.4() {
     
     ## Tests Start ##
     str=$(iptables -S -w60)
-    [ $(echo "$str" | grep -c -- "-A INPUT -m state --state ESTABLISHED -j ACCEPT") != 0 ] || state=1
-    [ $(echo "$str" | grep -c -- "-A OUTPUT -m state --state RELATED,ESTABLISHED -j ACCEPT") != 0 ] || state=2
+    [ $(echo "$str" | grep -c -- "-A INPUT.*-m state --state ESTABLISHED.*-j ACCEPT") != 0 ] || state=1
+    [ $(echo "$str" | grep -c -- "-A OUTPUT.*-m state --state NEW,ESTABLISHED.*-j ACCEPT") != 0 ] || state=2
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
@@ -1764,7 +1767,7 @@ test_4.2.1.3() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-    [ $(egrep -c '^\$FileCreateMode\s+0?640' /etc/rsyslog.conf) -gt 0 ] && result="Pass"
+    [ $(egrep '^\$FileCreateMode\s+0?640' /etc/rsyslog.conf /etc/rsyslog.d/*.conf | wc -l) -gt 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -2346,8 +2349,8 @@ test_5.4.4() {
     state=0
     
     ## Tests Start ##
-    [ $(grep -c "umask 027" /etc/bashrc) -eq 1 ] || state=$(( $state + 1 ))
-    [ $(grep -c "umask 027" /etc/profile) -eq 1 ] || state=$(( $state + 2 ))
+    [ $(grep -c "umask 027" /etc/bashrc) -gt 0 ] || state=$(( $state + 1 ))
+    [ $(grep -c "umask 027" /etc/profile) -gt 0 ] || state=$(( $state + 2 ))
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
