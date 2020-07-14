@@ -477,7 +477,7 @@ test_1.1.1.x() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-    [ $(diff -qsZ <(modprobe -n -v $filesystem 2>/dev/null | tail -1) <(echo "install /bin/true") &>/dev/null; echo $?) -ne 0 ] && state=$(( $state + 1 ))
+    [ $(diff -qsZ <(modprobe -n -v $filesystem 2>/dev/null | tail -n1) <(echo "install /bin/true") &>/dev/null; echo $?) -ne 0 ] && state=$(( $state + 1 ))
     [ $(lsmod | grep $filesystem | wc -l) -ne 0 ] && state=$(( $state + 2 ))
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
@@ -1301,7 +1301,7 @@ test_3.4.3() {
     
     ## Tests Start ##
     if [ -f /etc/hosts.deny ]; then
-        [ "$(tail -1 /etc/hosts.deny)" == "ALL: ALL" ] && result="Pass"
+        [ "$(tail -n1 /etc/hosts.deny)" == "ALL: ALL" ] && result="Pass"
     fi
     ## Tests End ##
     
@@ -1339,7 +1339,7 @@ test_3.5.x() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-    [ $(diff -qsZ <(modprobe -n -v $protocol 2>/dev/null | tail -1) <(echo "install /bin/true") &>/dev/null; echo $?) -ne 0 ] && state=1
+    [ $(diff -qsZ <(modprobe -n -v $protocol 2>/dev/null | tail -n1) <(echo "install /bin/true") &>/dev/null; echo $?) -ne 0 ] && state=1
     [ $(lsmod | grep $protocol | wc -l) -ne 0 ] && state=2
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
