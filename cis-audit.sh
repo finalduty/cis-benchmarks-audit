@@ -680,9 +680,9 @@ test_1.5.1() {
     state=0
     str='ExecStart=-/bin/sh -c "/usr/sbin/sulogin; /usr/bin/systemctl --fail --no-block default"'
     
-    [ "$(grep "hard core" /etc/security/limits.conf /etc/security/limits.d/*.conf | sed 's/^.*://' | uniq)" == "* hard core 0" ] || state=1
+    [ "$(grep "hard core" /etc/security/limits.conf /etc/security/limits.d/*.conf | sed -e 's/^.*://' -e 's/\s//g' | uniq)" == "*hardcore0" ] || state=1
     [ "$(sysctl fs.suid_dumpable)" == "fs.suid_dumpable = 0" ] || state=1
-    [ "$(grep "fs.suid_dumpable" /etc/sysctl.conf /etc/sysctl.d/*.conf | sed 's/^.*://' | uniq)" == "fs.suid_dumpable = 0" ] || state=1
+    [ "$(grep "fs.suid_dumpable" /etc/sysctl.conf /etc/sysctl.d/*.conf | sed -e 's/^.*://' -e 's/\s//g' | uniq)" == "fs.suid_dumpable=0" ] || state=1
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
@@ -716,7 +716,7 @@ test_1.5.3() {
     
     ## Tests Start ##
     [ "$(sysctl kernel.randomize_va_space)" == "kernel.randomize_va_space = 2" ] || state=1
-    [ "$(grep "kernel.randomize_va_space" /etc/sysctl.conf /etc/sysctl.d/*.conf | sed 's/^.*://' | uniq)" == "kernel.randomize_va_space = 2" ] || state=1
+    [ "$(grep "kernel.randomize_va_space" /etc/sysctl.conf /etc/sysctl.d/*.conf | sed -e 's/^.*://' -e 's/\s//g' | uniq)" == "kernel.randomize_va_space=2" ] || state=1
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
@@ -1209,7 +1209,7 @@ test_3.x-single() {
     
     ## Tests Start ##
     [ "$(sysctl net.$protocol.$sysctl)" == "net.$protocol.$sysctl = $val" ] && result="Pass"
-    [ "$(grep "net.$protocol.$sysctl" /etc/sysctl.conf /etc/sysctl.d/*.conf | sed 's/^.*://' | uniq)" == "net.$protocol.$sysctl = $val" ] || state=1
+    [ "$(grep "net.$protocol.$sysctl" /etc/sysctl.conf /etc/sysctl.d/*.conf | sed -e 's/^.*://' -e 's/\s//g' | uniq)" == "net.$protocol.$sysctl=$val" ] || state=1
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -1227,10 +1227,10 @@ test_3.x-double() {
     
     ## Tests Start ##
     [ "$(sysctl net.$protocol.conf.all.$sysctl)" == "net.$protocol.conf.all.$sysctl = $val" ] || state=1
-    [ "$(grep "net.$protocol.conf.all.$sysctl" /etc/sysctl.conf /etc/sysctl.d/*.conf | sed 's/^.*://' | uniq)" == "net.$protocol.conf.all.$sysctl = $val" ] || state=2
+    [ "$(grep "net.$protocol.conf.all.$sysctl" /etc/sysctl.conf /etc/sysctl.d/*.conf | sed -e 's/^.*://' -e 's/\s//g' | uniq)" == "net.$protocol.conf.all.$sysctl=$val" ] || state=2
     
     [ "$(sysctl net.$protocol.conf.default.$sysctl)" == "net.$protocol.conf.default.$sysctl = $val" ] || state=4
-    [ "$(grep "net.$protocol.conf.default.$sysctl" /etc/sysctl.conf /etc/sysctl.d/*.conf | sed 's/^.*://' | uniq)" == "net.$protocol.conf.default.$sysctl = $val" ] || state=8
+    [ "$(grep "net.$protocol.conf.default.$sysctl" /etc/sysctl.conf /etc/sysctl.d/*.conf | sed -e 's/^.*://' -e 's/\s//g' | uniq)" == "net.$protocol.conf.default.$sysctl=$val" ] || state=8
     
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
