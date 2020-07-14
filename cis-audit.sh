@@ -1,8 +1,8 @@
 #!/bin/bash
-## [rev: b71db33]
+## [rev: c09b031]
 
 ##
-## Copyright 2019 Andy Dustin
+## Copyright 2020 Andy Dustin
 ##
 ## Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except 
 ## in compliance with the License. You may obtain a copy of the License at
@@ -448,8 +448,8 @@ test_perms() {
     ## Tests Start ##
     u=$(echo $perms | cut -c1)
     g=$(echo $perms | cut -c2)
-    o=$(echo $perms | cut -c3 )
-    file_perms="$(stat $file | awk '/Access: \(/ {print $2}')"
+    o=$(echo $perms | cut -c3)
+    file_perms="$(stat -L $file | awk '/Access: \(/ {print $2}')"
     file_u=$(echo $file_perms | cut -c3)
     file_g=$(echo $file_perms | cut -c4)
     file_o=$(echo $file_perms | cut -c5)
@@ -1375,12 +1375,9 @@ test_3.6.3() {
     
     ## Tests Start ##
     str=$(iptables -S -w60)
-    [ $(echo "$str" | grep -c -- "-A INPUT -i lo -j ACCEPT") != 0 ] || state=$(( $state + 1 ))
-    [ $(echo "$str" | grep -c -- "-A OUTPUT -o lo -j ACCEPT") != 0 ] || state=$(( $state + 2 ))
-    
-    ## This check differs slightly from that specified in the standard. 
-    ## I personally believe it's safer to specify that the rule is not on the loopback interface
-    [ $(echo "$str" | egrep -c -- "-A INPUT -s 127\.0\.0\.0\/8(\s! -i lo)? -j (LOG_)?DROP") != 0 ] || state=$(( $state + 4 ))
+    [ $(echo "$str" | egrep -c -- "-A INPUT -i lo( -m comment --comment .*)? -j ACCEPT") != 0 ] || state=$(( $state + 1 ))
+    [ $(echo "$str" | egrep -c -- "-A OUTPUT -o lo( -m comment --comment .*)? -j ACCEPT") != 0 ] || state=$(( $state + 2 ))
+    [ $(echo "$str" | egrep -c -- "-A INPUT -s 127\.0\.0\.0\/8( -m comment --comment .*)? -j (LOG_)?DROP") != 0 ] || state=$(( $state + 4 ))
     
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
@@ -1397,8 +1394,8 @@ test_3.6.4() {
     
     ## Tests Start ##
     str=$(iptables -S -w60)
-    [ $(echo "$str" | grep -c -- "-A INPUT -m state --state ESTABLISHED -j ACCEPT") != 0 ] || state=1
-    [ $(echo "$str" | grep -c -- "-A OUTPUT -m state --state RELATED,ESTABLISHED -j ACCEPT") != 0 ] || state=2
+    [ $(echo "$str" | egrep -c -- "-A INPUT -m state --state ESTABLISHED( -m comment --comment .*)? -j ACCEPT") != 0 ] || state=1
+    [ $(echo "$str" | egrep -c -- "-A OUTPUT -m state --state RELATED,ESTABLISHED( -m comment --comment .*)? -j ACCEPT") != 0 ] || state=2
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
@@ -1764,7 +1761,8 @@ test_4.2.1.3() {
     test_start_time=$(test_start $id)
     
     ## Tests Start ##
-    [ $(egrep -c '^\$FileCreateMode\s+0?640' /etc/rsyslog.conf) -gt 0 ] && result="Pass"
+    included_files="$(awk '/^\$IncludeConfig / {print $2}' /etc/rsyslog.conf | paste -sd\ )"
+    [ $(egrep -hc '^\$FileCreateMode\s+0?640' /etc/rsyslog.conf $included_files 2>/dev/null | paste -sd+ | bc ) -gt 0 ] && result="Pass"
     ## Tests End ##
     
     duration="$(test_finish $id $test_start_time)ms"
@@ -2346,8 +2344,17 @@ test_5.4.4() {
     state=0
     
     ## Tests Start ##
-    [ $(grep -c "umask 027" /etc/bashrc) -eq 1 ] || state=$(( $state + 1 ))
-    [ $(grep -c "umask 027" /etc/profile) -eq 1 ] || state=$(( $state + 2 ))
+    masks=$(awk '/^(\s+)?umask\s+[027]{3}/ {print $2}' /etc/bashrc /etc/profile)
+    [ -z "$masks" ] && state=1
+
+    for mask in $masks; do
+        bits=($(echo $mask | grep -o .))
+        
+        [ ${bits[0]} -lt 0 ] && state=2
+        [ ${bits[1]} -lt 2 ] && state=2
+        [ ${bits[2]} -lt 7 ] && state=2
+    done
+
     [ $state -eq 0 ] && result="Pass"
     ## Tests End ##
     
@@ -2831,7 +2838,8 @@ if [ $(is_test_included 1; echo $?) -eq 0 ]; then   write_cache "1,Initial Setup
     
     ## Section 1.2 - Configure Software Updates
     if [ $(is_test_included 1.2; echo $?) -eq 0 ]; then   write_cache "1.2,Configure Software Updates"
-        run_test 1.2.1 1 test_1.2.1   ## 1.2.1 Ensure package manager repositories are configured
+        #run_test 1.2.1 1 test_1.2.1   ## 1.2.1 Ensure package manager repositories are configured
+        run_test 1.2.1 1 skip_test "Ensure package manager repositories are configured"
         run_test 1.2.2 1 test_1.2.2   ## 1.2.2 Ensure GPG keys are configured
         run_test 1.2.3 1 test_1.2.3   ## 1.2.3 Ensure gpgcheck is globally activated    
     fi
