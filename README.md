@@ -21,6 +21,7 @@ No changes are made to system files by this script.
          --level (1,2)           Run tests for the specified level only
          --include "<test_ids>"  Space delimited list of tests to include
          --exclude "<test_ids>"  Space delimited list of tests to exclude
+         --output-json           output the results to the terminal for json
          --nice                  Lowers the CPU priority of executing tests
          --no-colour             Disable colouring for STDOUT (Note that output redirected to a file/pipe is never coloured)
 

@@ -43,6 +43,7 @@ renice_value=5
 start_time=$(date +%s)
 color=True
 test_level=0
+output_json=False
 
 
 ### Functions ###
@@ -113,6 +114,7 @@ EOF
 |||--level (1,2)|Run tests for the specified level only
 |||--include "<test_ids>"|Space delimited list of tests to include
 |||--exclude "<test_ids>"|Space delimited list of tests to exclude
+|||--output-json|output the results to the terminal for json
 |||--nice |Lower the CPU priority for test execution. This is the default behaviour.
 |||--no-nice|Do not lower CPU priority for test execution. This may make the tests complete faster but at 
 ||||the cost of putting a higher load on the server. Setting this overrides the --nice option.
@@ -147,12 +149,33 @@ exit 0
 now() {
     echo $(( $(date +%s%N) / 1000000 ))
 } ## Short function to give standardised time for right now (saves updating the date method everywhere)
+outputter_to_json() {
+    echo -e "[\c"
+    first=true
+    sort -V test.log | while read line; do
+    ID=$(echo $line|cut -d, -f1)
+    if [ ! -n "$ID" ]; then
+        continue
+    fi
+    Description=$(echo $line|cut -d, -f2)
+    Scoring=$(echo $line|cut -d, -f3)
+    Level=$(echo $line|cut -d, -f4)
+    Result=$(echo $line|cut -d, -f5)
+    Duration=$(echo $line|cut -d, -f6)
+    if [ "$first" == true ]; then
+        echo -e "{\"ID\":\"$ID\",\"Description\":\"$Description\",\"Scoring\":\"$Scoring\",\"Level\":\"$Level\",\"Result\":\"$Result\",\"Duration\":\"$Duration\"}\c"
+        first=false
+    else
+        echo -e ",{\"ID\":\"$ID\",\"Description\":\"$Description\",\"Scoring\":\"$Scoring\",\"Level\":\"$Level\",\"Result\":\"$Result\",\"Duration\":\"$Duration\"}\c"
+    fi
+    done
+    echo -e "]\c"
+} ## Prettily output the results to the terminal for json
 outputter() {
     write_debug "Formatting and writing results to STDOUT"
     echo
     echo " CIS CentOS 7 Benchmark v2.2.0 Results "
     echo "---------------------------------------"
-    
     if [ -t 1 -a $color == "True" ]; then
         (
             echo "ID,Description,Scoring,Level,Result,Duration"
@@ -194,6 +217,10 @@ parse_args() {
     ## Check arguments for --debug
     $(echo $args | grep -- '--debug' &>/dev/null)  &&   debug="True" || debug="False"
     write_debug "Debug enabled"
+
+    ## Check arguments for --output-json
+    $(echo $args | grep -- '--output-json' &>/dev/null)  &&   output_json="True" || output_json="False"
+    write_debug "output_json enabled"
     
     ## Full noise output
     $(echo $args | grep -- '--trace' &>/dev/null) &&  trace="True" && set -x
@@ -3145,7 +3172,12 @@ echo "FINISHED" > $tmp_file_base-stage
 write_debug "All tests have completed"
 
 ## Output test results
-outputter
+if [ $output_json == "True" ]; then
+  outputter_to_json
+else
+  outputter
+fi
+
 tidy_up
 
 write_debug "Exiting with code $exit_code"
