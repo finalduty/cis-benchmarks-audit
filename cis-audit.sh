@@ -152,7 +152,7 @@ now() {
 outputter_to_json() {
     echo -e "[\c"
     first=true
-    sort -V test.log | while read line; do
+    sort -V $tmp_file | while read line; do
     ID=$(echo $line|cut -d, -f1)
     if [ ! -n "$ID" ]; then
         continue
