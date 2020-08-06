@@ -286,7 +286,9 @@ progress() {
         char=${array[$pos]}
         
         script_duration="$(date +%T -ud @$(( $(date +%s) - $start_time )))"
-        printf "\r[$script_duration] ($char) $finished of $started tests completed " >&2
+        if [ $output_json == "False" ]; then
+            printf "\r[$script_duration] ($char) $finished of $started tests completed " >&2
+        fi
         
         #ps --ppid $$ >> ~/tmp/cis-audit
         #running_children >> ~/tmp/cis-audit
@@ -299,7 +301,10 @@ progress() {
     finished=$( wc -l $finished_counter | awk '{print $1}' )
     script_duration="$(date +%T -ud @$(( $(date +%s) - $start_time )))"
     #printf "\r[✓] $finished of $finished tests completed\n" >&2
-    printf "\r[$script_duration] (✓) $started of $started tests completed\n" >&2
+    if [ $output_json == "False" ]; then
+        printf "\r[$script_duration] (✓) $started of $started tests completed\n" >&2
+    fi
+    
 } ## Prints a pretty progress spinner while running tests
 run_test() {
     id=$1
