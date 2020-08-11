@@ -152,7 +152,7 @@ now() {
 } ## Short function to give standardised time for right now (saves updating the date method everywhere)
 outputter_to_json() {
     ## clear file
-    cat/dev/null > $output_json_file
+    cat /dev/null > $output_json_file
     echo -e "[\c" >> $output_json_file
     first=true
     sort -V $tmp_file | while read line; do
