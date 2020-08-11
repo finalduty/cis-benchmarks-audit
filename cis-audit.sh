@@ -44,6 +44,7 @@ start_time=$(date +%s)
 color=True
 test_level=0
 output_json=False
+output_json_file="/opt/app/cis/result.json"
 
 
 ### Functions ###
@@ -149,8 +150,10 @@ exit 0
 now() {
     echo $(( $(date +%s%N) / 1000000 ))
 } ## Short function to give standardised time for right now (saves updating the date method everywhere)
-outputter_to_json() {
-    echo -e "[\c"
+outputter_to_json_file() {
+    ## clear file
+    cat/dev/null > $output_json_file
+    echo -e "[\c" >> $output_json_file
     first=true
     sort -V $tmp_file | while read line; do
     ID=$(echo $line|cut -d, -f1)
@@ -163,13 +166,13 @@ outputter_to_json() {
     Result=$(echo $line|cut -d, -f5)
     Duration=$(echo $line|cut -d, -f6)
     if [ "$first" == true ]; then
-        echo -e "{\"ID\":\"$ID\",\"Description\":\"$Description\",\"Scoring\":\"$Scoring\",\"Level\":\"$Level\",\"Result\":\"$Result\",\"Duration\":\"$Duration\"}\c"
+        echo -e "{\"ID\":\"$ID\",\"Description\":\"$Description\",\"Scoring\":\"$Scoring\",\"Level\":\"$Level\",\"Result\":\"$Result\",\"Duration\":\"$Duration\"}\c" >> $output_json_file
         first=false
     else
-        echo -e ",{\"ID\":\"$ID\",\"Description\":\"$Description\",\"Scoring\":\"$Scoring\",\"Level\":\"$Level\",\"Result\":\"$Result\",\"Duration\":\"$Duration\"}\c"
+        echo -e ",{\"ID\":\"$ID\",\"Description\":\"$Description\",\"Scoring\":\"$Scoring\",\"Level\":\"$Level\",\"Result\":\"$Result\",\"Duration\":\"$Duration\"}\c" >> $output_json_file
     fi
     done
-    echo -e "]\c"
+    echo -e "]\c" >> $output_json_file
 } ## Prettily output the results to the terminal for json
 outputter() {
     write_debug "Formatting and writing results to STDOUT"
