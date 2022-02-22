@@ -1,0 +1,17 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+
+[dev-packages]
+cis-benchmarks-audit = {editable = true, path = "."}
+flake8 = "*"
+mock = "*"
+pytest-cov = "*"
+vermin = "*"
+setuptools = "*"
+
+[requires]
+python_version = "3.6"

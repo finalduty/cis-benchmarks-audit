@@ -1,0 +1,11 @@
+[flake8]
+ignore = 
+    E501 E265 E266
+    W293
+    
+exclude =
+    .archive,
+    .git,
+    __pycache__,
+    build,
+    dist,

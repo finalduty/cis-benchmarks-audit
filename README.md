@@ -1,4 +1,5 @@
 # CIS Benchmarks Audit
+![version](https://img.shields.io/github/v/tag/finalduty/cis-benchmarks-audit?include_prereleases&label=latest&logo=python)[![GitHub Actions](https://github.com/finalduty/cis-benchmarks-audit/actions/workflows/build.yml/badge.svg)](https://github.com/finalduty/cis-benchmarks-audit/actions/workflows/build.yml)[![](https://img.shields.io/github/license/finalduty/cis-benchmarks-audit)](https://github.com/finalduty/cis-benchmarks-audit/blob/]main/LICENSE) [![img](https://img.shields.io/badge/semver-2.0.0-green)](https://semver.org)
 
 This repo contains a bash script which performs tests against your CentOS system to give an indication of whether the running server may compliy with the CIS v2.2.0 Benchmarks for CentOS. https://learn.cisecurity.org/benchmarks
 
