@@ -1,0 +1,7 @@
+[tool.black]
+line-length = 999
+skip-string-normalization = true
+target-version = ['py36']
+
+[tool.isort]
+profile = "black"

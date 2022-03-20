@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
 
-import cis_audit
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 
-def mock_stopped(cmd):
-    output = ['inactive']
-    error = ['']
-    returncode = 3
-
-    return SimpleNamespace(stdout=output, stderr=error, returncode=returncode)
+from cis_audit import CISAudit
 
 
-def mock_active(cmd):
+def mock_active(*args, **kwargs):
     output = ['active']
     error = ['']
     returncode = 0
@@ -21,29 +16,42 @@ def mock_active(cmd):
     return SimpleNamespace(stdout=output, stderr=error, returncode=returncode)
 
 
-def mock_error(cmd):
-    raise Exception
+def mock_stopped(*args, **kwargs):
+    output = ['inactive']
+    error = ['']
+    returncode = 3
+
+    return SimpleNamespace(stdout=output, stderr=error, returncode=returncode)
+
+
+def mock_error(*args, **kwargs):
+    output = ['']
+    error = ['Failed to get unit file state for pytest.service: No such file or directory']
+    returncode = 1
+
+    return SimpleNamespace(stdout=output, stderr=error, returncode=returncode)
 
 
 class TestService:
-    test = cis_audit.CISAudit()
+    test = CISAudit()
     test_id = '1.1'
     test_service = 'pytest'
 
-    @patch.object(cis_audit, "shellexec", mock_stopped)
-    def test_service_stopped(self, caplog):
-        result = self.test.audit_service_is_active(self.test_id, service=self.test_service)
+    @patch.object(CISAudit, "_shellexec", mock_active)
+    def test_service_active_pass(self):
+        state = self.test.audit_service_is_active(service=self.test_service)
+        assert state == 0
 
-        assert result == 'Fail'
+    @patch.object(CISAudit, "_shellexec", mock_stopped)
+    def test_service_active_fail(self):
+        state = self.test.audit_service_is_active(service=self.test_service)
+        assert state == 1
 
-    @patch.object(cis_audit, "shellexec", mock_active)
-    def test_service_active(self, caplog):
-        result = self.test.audit_service_is_active(self.test_id, service=self.test_service)
 
-        assert result == 'Pass'
+#    @patch.object(CISAudit, "_shellexec", mock_error)
+#    def test_service_active_error(self):
+#        state = self.test.audit_service_is_active(service=self.test_service)
+#        assert state == -1
 
-    @patch.object(cis_audit, "shellexec", mock_error)
-    def test_service_error(self, caplog):
-        result = self.test.audit_service_is_active(self.test_id, service=self.test_service)
-
-        assert result == 'Error'
+if __name__ == '__main__':
+    pytest.main([__file__])

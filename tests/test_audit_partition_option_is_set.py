@@ -1,11 +1,16 @@
+#!/usr/bin/env python3
+
 #!/usrbin/env python3
 
-import cis_audit
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 
-def mock_option_set(cmd):
+from cis_audit import CISAudit
+
+
+def mock_option_set(self, cmd):
     output = ['xfs on /pytest type proc (rw,nosuid,nodev,noexec,relatime)']
     error = ['']
     returncode = 0
@@ -13,7 +18,7 @@ def mock_option_set(cmd):
     return SimpleNamespace(stdout=output, stderr=error, returncode=returncode)
 
 
-def mock_option_not_set(cmd):
+def mock_option_not_set(self, cmd):
     output = ['']
     error = ['']
     returncode = 1
@@ -22,20 +27,21 @@ def mock_option_not_set(cmd):
 
 
 class TestPartitionOptions:
-    test = cis_audit.CISAudit()
+    test = CISAudit()
     test_id = '1.1'
     test_level = 1
     partition = '/pytest'
     option = 'noexec'
 
-    @patch.object(cis_audit, "shellexec", mock_option_set)
+    @patch.object(CISAudit, "_shellexec", mock_option_set)
     def test_partition_option_is_set(self):
-        result = self.test.audit_partition_option_is_set(self.test_id, partition=self.partition, option=self.option)
+        state = self.test.audit_partition_option_is_set(partition=self.partition, option=self.option)
+        assert state == 0
 
-        assert result == 'Pass'
-
-    @patch.object(cis_audit, "shellexec", mock_option_not_set)
+    @patch.object(CISAudit, "_shellexec", mock_option_not_set)
     def test_partition_option_is_not_set(self):
-        result = self.test.audit_partition_option_is_set(self.test_id, partition=self.partition, option=self.option)
+        state = self.test.audit_partition_option_is_set(partition=self.partition, option=self.option)
+        assert state == 1
 
-        assert result == 'Fail'
+if __name__ == '__main__':
+    pytest.main([__file__])

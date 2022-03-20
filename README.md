@@ -1,10 +1,16 @@
 # CIS Benchmarks Audit
-![version](https://img.shields.io/github/v/tag/finalduty/cis-benchmarks-audit?include_prereleases&label=latest&logo=python)[![GitHub Actions](https://github.com/finalduty/cis-benchmarks-audit/actions/workflows/build.yml/badge.svg)](https://github.com/finalduty/cis-benchmarks-audit/actions/workflows/build.yml)[![](https://img.shields.io/github/license/finalduty/cis-benchmarks-audit)](https://github.com/finalduty/cis-benchmarks-audit/blob/]main/LICENSE) [![img](https://img.shields.io/badge/semver-2.0.0-green)](https://semver.org)
+<p>
+<a href="https://github.com/finalduty/cis-benchmarks-audit/tags"><img alt="Latest version" src="https://img.shields.io/github/v/tag/finalduty/cis-benchmarks-audit?include_prereleases&label=latest&logo=python"></a>
+<a href="https://github.com/finalduty/cis-benchmarks-audit/actions/workflows/build.yml"><img alt="GitHub Actions" src="https://github.com/finalduty/cis-benchmarks-audit/actions/workflows/build.yml/badge.svg"></a>
+<a href="https://github.com/finalduty/cis-benchmarks-audit/blob/main/LICENSE"><img alt="License Apache-2.0" src="https://img.shields.io/github/license/finalduty/cis-benchmarks-audit"></a>
+<a href="https://www.codefactor.io/repository/github/finalduty/cis-benchmarks-audit/badge"><img alt="CodeFactor" src="https://www.codefactor.io/repository/github/finalduty/cis-benchmarks-audit/badge"></a>
+<a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black(ish)-000000.svg"></a>
+</p>
 
 This repo contains a bash script which performs tests against your CentOS system to give an indication of whether the running server may compliy with the CIS v2.2.0 Benchmarks for CentOS. https://learn.cisecurity.org/benchmarks
 
 _Only CentOS 7 is supported at this time._
-
+https://www.cisecurity.org/cis-securesuite/cis-securesuite-membership-terms-of-use/
 ### How do I use this?
 #### Download:
 

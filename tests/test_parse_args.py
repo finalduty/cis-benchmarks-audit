@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
+
 ## andy.dustin@gmail.com [rev: 83422a0e]
 
 from os import path
-from cis_audit import parse_arguments
+
+import cis_audit
+import pytest
+
+test = cis_audit.CISAudit()
 
 
 def test_parse_debug(caplog):
     """Test that the '--debug' argument turns on debug logging"""
     args = [path.relpath(__file__), '--debug']
-    parse_arguments(argv=args)
+    cis_audit.parse_arguments(argv=args)
 
     assert caplog.records[0].msg == 'Debugging enabled'
 
@@ -16,7 +21,7 @@ def test_parse_debug(caplog):
 def test_parse_log_level_debug(caplog):
     """Test that the '--log-level DEBUG' argument turns on debug logging"""
     args = [path.relpath(__file__), '--log-level', 'DEBUG']
-    parse_arguments(args)
+    cis_audit.parse_arguments(args)
 
     assert caplog.records[0].msg == 'Debugging enabled'
 
@@ -25,7 +30,7 @@ def test_parse_level_1(caplog):
     """Test that the '--level 1' argument sets args.level to 1"""
     args = [path.relpath(__file__), '--debug', '--level', '1']
 
-    parse_arguments(argv=args)
+    cis_audit.parse_arguments(argv=args)
     status = False
 
     for record in caplog.records:
@@ -39,7 +44,7 @@ def test_parse_level_1(caplog):
 def test_parse_level_2(caplog):
     """Test that the '--level 2' argument sets args.level to 2"""
     args = [path.relpath(__file__), '--debug', '--level', '2']
-    parse_arguments(argv=args)
+    cis_audit.parse_arguments(argv=args)
     status = False
 
     for record in caplog.records:
@@ -53,7 +58,7 @@ def test_parse_level_2(caplog):
 def test_parse_level_default(caplog):
     """Test that the default level argument sets args.level to 0"""
     args = [path.relpath(__file__), '--debug']
-    parse_arguments(argv=args)
+    cis_audit.parse_arguments(argv=args)
 
     status = False
     for record in caplog.records:
@@ -66,7 +71,7 @@ def test_parse_level_default(caplog):
 
 def test_parse_include(caplog):
     args = [path.relpath(__file__), '--debug', '--include', '1.1', '2.2.2']
-    parse_arguments(argv=args)
+    cis_audit.parse_arguments(argv=args)
     status = False
 
     for record in caplog.records:
@@ -79,7 +84,7 @@ def test_parse_include(caplog):
 
 def test_parse_exclude(caplog):
     args = [path.relpath(__file__), '--debug', '--exclude', '1.1', '2.2.2']
-    parse_arguments(argv=args)
+    cis_audit.parse_arguments(argv=args)
     status = False
 
     for record in caplog.records:
@@ -92,7 +97,7 @@ def test_parse_exclude(caplog):
 
 def test_parse_nice(caplog):
     args = [path.relpath(__file__), '--debug', '--nice']
-    parse_arguments(argv=args)
+    cis_audit.parse_arguments(argv=args)
     status = False
 
     for record in caplog.records:
@@ -105,7 +110,7 @@ def test_parse_nice(caplog):
 
 def test_parse_no_nice(caplog):
     args = [path.relpath(__file__), '--debug', '--no-nice']
-    parse_arguments(argv=args)
+    cis_audit.parse_arguments(argv=args)
     status = True
 
     for record in caplog.records:
@@ -118,7 +123,7 @@ def test_parse_no_nice(caplog):
 
 def test_parse_no_color(caplog):
     args = [path.relpath(__file__), '--debug', '--no-color']
-    parse_arguments(argv=args)
+    cis_audit.parse_arguments(argv=args)
     status = False
 
     for record in caplog.records:
@@ -131,7 +136,7 @@ def test_parse_no_color(caplog):
 
 def test_parse_no_colour(caplog):
     args = [path.relpath(__file__), '--debug', '--no-colour']
-    parse_arguments(argv=args)
+    cis_audit.parse_arguments(argv=args)
     status = False
 
     for record in caplog.records:
@@ -140,3 +145,7 @@ def test_parse_no_colour(caplog):
             break
 
     assert status
+
+
+if __name__ == '__main__':
+    pytest.main([__file__])

@@ -1,11 +1,16 @@
+#!/usr/bin/env python3
+
 #!/usrbin/env python3
 
-import cis_audit
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 
-def mock_sticky_bit_set(cmd):
+from cis_audit import CISAudit
+
+
+def mock_sticky_bit_set(self, cmd):
     output = ['']
     error = ['']
     returncode = 0
@@ -13,7 +18,7 @@ def mock_sticky_bit_set(cmd):
     return SimpleNamespace(stdout=output, stderr=error, returncode=returncode)
 
 
-def mock_sticky_bit_not_set(cmd):
+def mock_sticky_bit_not_set(self, cmd):
     output = ['/pytest']
     error = ['']
     returncode = 0
@@ -21,7 +26,7 @@ def mock_sticky_bit_not_set(cmd):
     return SimpleNamespace(stdout=output, stderr=error, returncode=returncode)
 
 
-def mock_sticky_bit_error(cmd):
+def mock_sticky_bit_error(self, cmd):
     output = ['']
     error = ['find: invalid expression; I was expecting to find a \')\' somewhere but did not see one.']
     returncode = 123
@@ -30,23 +35,18 @@ def mock_sticky_bit_error(cmd):
 
 
 class TestPartitionOptions:
-    test = cis_audit.CISAudit()
+    test = CISAudit()
     test_id = '1.1'
 
-    @patch.object(cis_audit, "shellexec", mock_sticky_bit_set)
+    @patch.object(CISAudit, "_shellexec", mock_sticky_bit_set)
     def test_directory_sticky_bit_is_set(self):
-        result = self.test.audit_sticky_bit_on_world_writable_dirs(self.test_id)
+        state = self.test.audit_sticky_bit_on_world_writable_dirs()
+        assert state == 0
 
-        assert result == 'Pass'
-
-    @patch.object(cis_audit, "shellexec", mock_sticky_bit_not_set)
+    @patch.object(CISAudit, "_shellexec", mock_sticky_bit_not_set)
     def test_directory_sticky_bit_is_not_set(self):
-        result = self.test.audit_sticky_bit_on_world_writable_dirs(self.test_id)
+        state = self.test.audit_sticky_bit_on_world_writable_dirs()
+        assert state == 1
 
-        assert result == 'Fail'
-
-    @patch.object(cis_audit, "shellexec", mock_sticky_bit_error)
-    def test_directory_sticky_bit_error(self):
-        result = self.test.audit_sticky_bit_on_world_writable_dirs(self.test_id)
-
-        assert result == 'Error'
+if __name__ == '__main__':
+    pytest.main([__file__])

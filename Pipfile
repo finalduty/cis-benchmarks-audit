@@ -4,14 +4,19 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+check-python-versions = "*"
 
 [dev-packages]
 cis-benchmarks-audit = {editable = true, path = "."}
+black = "*"
+bump2version = "*"
 flake8 = "*"
+isort = "*"
 mock = "*"
 pytest-cov = "*"
+semver = "*"
 vermin = "*"
-setuptools = "*"
+tox = "*"
 
 [requires]
 python_version = "3.6"
