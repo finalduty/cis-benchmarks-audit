@@ -20,6 +20,7 @@
 __version__ = '0.20.0-alpha1+83522f24'
 
 ### Imports ###
+import json  # https://docs.python.org/3/library/json.html
 import logging  # https://docs.python.org/3/library/logging.html
 import os  # https://docs.python.org/3/library/os.html
 import pdb  # noqa https://docs.python.org/3/library/pdb.html
@@ -434,7 +435,6 @@ class CISAudit:
 
         if r.stdout[0] != '':
             state += 1
-            print(r.stdout)
 
         return state
 
@@ -446,7 +446,6 @@ class CISAudit:
 
         if r.stdout[0] != '':
             state += 1
-            print(r.stdout)
 
         return state
 
@@ -1842,9 +1841,38 @@ class CISAudit:
 
         return state
 
-    def output(self, results) -> None:
-        for result in results:
-            print(result)
+    def output(self, format: str, data: list) -> None:
+        if format == 'csv':
+            for record in data:
+                if len(record) == 2:
+                    print(f'{record[0]},{record[1]},,,')
+                elif len(record) == 4:
+                    print(f'{record[0]},{record[1]},{record[2]},{record[3]},')
+                elif len(record) == 5:
+                    print(f'{record[0]},{record[1]},{record[2]},{record[3]},{record[4]}')
+
+        elif format == 'json':
+            output = {}
+
+            for record in data:
+                id = record[0]
+                output[id] = {}
+                output[id]['description'] = record[1]
+
+                if len(record) >= 3:
+                    output[id]['level'] = record[2]
+
+                if len(record) >= 4:
+                    output[id]['result'] = record[3]
+
+                if len(record) >= 5:
+                    output[id]['duration'] = record[4]
+
+            print(json.dumps(output))
+
+        elif format == 'text':
+            for record in data:
+                print(record)
 
     def run_tests(self, tests: "list[dict]") -> dict:
         results = []
@@ -1928,7 +1956,7 @@ class CISAudit:
                     elif state == -2:
                         result = "Skipped"
                     else:
-                        self.log.warning(f'Test {test_id} failed with state {state}')
+                        self.log.debug(f'Test {test_id} failed with state {state}')
                         result = "Fail"
 
                     results.append((test_id, test_description, test_level, result, duration))
@@ -2253,11 +2281,11 @@ def main():  # pragma: no cover
     # test_list = audit.get_tests_list(host_os, benchmarks_version)
     test_list = benchmarks[host_os][benchmark_version]
     results = audit.run_tests(test_list)
-    audit.output(results)
+    audit.output(config.out_format, results)
 
 
 def parse_arguments(argv=sys.argv):
-    description = "This script runs tests on the system to check for compliance against the CIS CentOS 7 Benchmarks. No changes are made to system files by this script."
+    description = "This script runs tests on the system to check for compliance against the CIS Benchmarks. No changes are made to system files by this script."
     epilog = f"""
 Examples:
     
@@ -2279,6 +2307,7 @@ Examples:
 
     level_choices = [1, 2]
     log_level_choices = ['DEBUG', 'INFO', 'WARNING', 'CRITICAL']
+    output_choices = ['csv', 'json', 'text']
     system_type_choices = ['server', 'workstation']
     version_str = f'{os.path.basename(__file__)} {__version__})'
 
@@ -2295,6 +2324,10 @@ Examples:
     parser.add_argument('--system-type', action='store', choices=system_type_choices, default='server', help='Set which test level to reference')
     parser.add_argument('--server', action='store_const', const='server', dest='system_type', help='Use "server" levels to determine which tests to run. Equivalent to --system-type server [Default]')
     parser.add_argument('--workstation', action='store_const', const='workstation', dest='system_type', help='Use "workstation" levels to determine which tests to run. Equivalent to --system-type workstation')
+    parser.add_argument('--outformat', action='store', choices=output_choices, default='text', help='Output type for results')
+    parser.add_argument('--text', action='store_const', const='text', dest='outformat', help='Output results as text. Equivalent to --output text [default]')
+    parser.add_argument('--json', action='store_const', const='json', dest='outformat', help='Output results as json. Equivalent to --output json')
+    parser.add_argument('--csv', action='store_const', const='csv', dest='outformat', help='Output results as csv. Equivalent to --output csv')
     parser.add_argument('-V', '--version', action='version', version=version_str, help='Print version and exit')
     parser.add_argument('-c', '--config', action='store', help='Location of config file to load')
 
@@ -2340,6 +2373,14 @@ Examples:
         logger.debug('Going to use "server" levels for test determination')
     elif args.system_type == 'workstation':
         logger.debug('Going to use "workstation" levels for test determination')
+
+    ## --outformat
+    if args.outformat == 'text':
+        logger.debug('Going to use "text" outputter')
+    elif args.outformat == 'json':
+        logger.debug('Going to use "json" outputter')
+    elif args.outformat == 'csv':
+        logger.debug('Going to use "csv" outputter')
 
     return args
 
