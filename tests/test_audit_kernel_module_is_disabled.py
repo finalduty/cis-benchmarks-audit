@@ -49,23 +49,23 @@ def mock_filesystem_not_found(self, cmd):
 
 class TestFilesystemDisabled:
     test = CISAudit()
-    test_level = 1
-    test_filesystems = ['pytest', 'pytest']
+    module = 'pytest'
 
     @patch.object(CISAudit, "_shellexec", mock_module_disabled)
     def test_filesystem_disabled(self):
-        state = self.test.audit_kernel_module_is_disabled(modules=self.test_filesystems)
+        state = self.test.audit_kernel_module_is_disabled(module=self.module)
         assert state == 0
 
     @patch.object(CISAudit, "_shellexec", mock_module_enabled)
     def test_filesystem_enabled(self):
-        state = self.test.audit_kernel_module_is_disabled(modules=self.test_filesystems)
+        state = self.test.audit_kernel_module_is_disabled(module=self.module)
         assert state == 1
 
     @patch.object(CISAudit, "_shellexec", mock_filesystem_not_found)
     def test_filesystem_not_found(self):
-        state = self.test.audit_kernel_module_is_disabled(modules=self.test_filesystems)
+        state = self.test.audit_kernel_module_is_disabled(module=self.module)
         assert state == 0
+
 
 if __name__ == '__main__':
     pytest.main([__file__])

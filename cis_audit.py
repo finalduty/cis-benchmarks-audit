@@ -52,7 +52,7 @@ class CISAudit:
         self.log = logging.getLogger(__name__)
         self.log.setLevel(self.config.log_level)
 
-    def _shellexec(self, command, check=False):  # pragma: no cover
+    def _shellexec(self, command):  # pragma: no cover
         """Execute shell command on the system. Supports piped commands
 
         Parameters
@@ -83,9 +83,6 @@ class CISAudit:
             output = ''.split('\n')
             error = e.args[1].split('\n')
             returncode = 1
-
-        if check is True and returncode != 0:
-            return subprocess.CalledProcessError(returncode=returncode, cmd=command, stdout=output, stderr=error)
 
         return SimpleNamespace(stdout=output, stderr=error, returncode=returncode)
 
@@ -848,9 +845,9 @@ class CISAudit:
                     ## Add unique state so we can identify which bit a permission failed on, for debugging
                     this_failure_score = 2 ** (i + 2)
                     state += this_failure_score
-                    self.log.info(f'Test comparison for {file}, {octal_expected_mode}>={octal_file_mode} {binary_expected_mode[i]} == {binary_file_mode[i]}. Failed at index {i}. Adding {this_failure_score} to state')
+                    self.log.debug(f'Test comparison for {file}, {octal_expected_mode}>={octal_file_mode} {binary_expected_mode[i]} == {binary_file_mode[i]}. Failed at index {i}. Adding {this_failure_score} to state')
                 else:
-                    self.log.info(f'Test comparison for {file}, {octal_expected_mode}>={octal_file_mode} {binary_expected_mode[i]} == {binary_file_mode[i]}. Passed at index {i}')
+                    self.log.debug(f'Test comparison for {file}, {octal_expected_mode}>={octal_file_mode} {binary_expected_mode[i]} == {binary_file_mode[i]}. Passed at index {i}')
 
         return state
 
@@ -1090,24 +1087,23 @@ class CISAudit:
 
         return state
 
-    def audit_kernel_module_is_disabled(self, modules: list) -> int:
+    def audit_kernel_module_is_disabled(self, module: str) -> int:
         state = 0
-        for module in modules:
-            cmd = f'modprobe -n -v {module} | grep -E "({module}|install)"'
-            r = self._shellexec(cmd)
+        cmd = f'modprobe -n -v {module} | grep -E "({module}|install)"'
+        r = self._shellexec(cmd)
 
-            if r.stdout[0] == 'install /bin/true\n':
-                pass
-            elif r.stderr[0] == f'modprobe: FATAL: Module {module} not found.\n':
-                pass
-            else:
-                state = 1
+        if r.stdout[0] == 'install /bin/true\n':
+            pass
+        elif r.stderr[0] == f'modprobe: FATAL: Module {module} not found.\n':
+            pass
+        else:
+            state = 1
 
-            cmd = R'lsmod'
-            r = self._shellexec(cmd)
+        cmd = R'lsmod'
+        r = self._shellexec(cmd)
 
-            if module in r.stdout[0]:
-                state = 1
+        if module in r.stdout[0]:
+            state = 1
 
         return state
 
@@ -1315,19 +1311,18 @@ class CISAudit:
 
         return state
 
-    def audit_package_is_installed(self, packages: str) -> int:
-        state = 0
-        for index, package in enumerate(packages):
-            cmd = f'rpm -q {package}'
-            r = self._shellexec(cmd)
+    def audit_package_is_installed(self, package: str) -> int:
+        cmd = f'rpm -q {package}'
+        r = self._shellexec(cmd)
 
-            if r.returncode != 0:
-                state += 2**index
+        if r.returncode != 0:
+            state = 1
+        else:
+            state = 0
 
         return state
 
     def audit_package_not_installed(self, package: str) -> int:
-        state = 0
         cmd = f'rpm -q {package}'
         r = self._shellexec(cmd)
 
@@ -1335,8 +1330,6 @@ class CISAudit:
             state = 0
         else:
             state = 1
-
-        state = r.returncode
 
         return state
 
@@ -1668,7 +1661,7 @@ class CISAudit:
         state = 0
 
         cmd = f'systemctl is-enabled {service}'
-        r = self._shellexec(cmd, check=True)
+        r = self._shellexec(cmd)
         if r.stdout[0] != 'disabled':
             state += 1
 
@@ -1678,7 +1671,7 @@ class CISAudit:
         state = 0
 
         cmd = f'systemctl is-enabled {service}'
-        r = self._shellexec(cmd, check=True)
+        r = self._shellexec(cmd)
         if r.stdout[0] != 'enabled':
             state += 1
 
@@ -1688,12 +1681,12 @@ class CISAudit:
         state = 0
 
         cmd = f'systemctl is-enabled {service}'
-        r = self._shellexec(cmd, check=True)
+        r = self._shellexec(cmd)
         if r.stdout[0] != 'enabled':
             state += 1
 
         cmd = f'systemctl is-active {service}'
-        r = self._shellexec(cmd, check=True)
+        r = self._shellexec(cmd)
         if r.stdout[0] != 'active':
             state += 2
 
@@ -1842,14 +1835,21 @@ class CISAudit:
         return state
 
     def output(self, format: str, data: list) -> None:
-        if format == 'csv':
+        if format in ['csv', 'psv', 'tsv']:
+            if format == 'csv':
+                sep = ','
+            elif format == 'psv':
+                sep = '|'
+            elif format == 'tsv':
+                sep = '\t'
+            print(f'ID{sep}Description{sep}Level{sep}Result{sep}Duration')
             for record in data:
                 if len(record) == 2:
-                    print(f'{record[0]},{record[1]},,,')
+                    print(f'{record[0]}{sep}"{record[1]}"{sep}{sep}{sep}')
                 elif len(record) == 4:
-                    print(f'{record[0]},{record[1]},{record[2]},{record[3]},')
+                    print(f'{record[0]}{sep}"{record[1]}"{sep}{record[2]}{sep}{record[3]}{sep}')
                 elif len(record) == 5:
-                    print(f'{record[0]},{record[1]},{record[2]},{record[3]},{record[4]}')
+                    print(f'{record[0]}{sep}"{record[1]}"{sep}{record[2]}{sep}{record[3]}{sep}{record[4]}')
 
         elif format == 'json':
             output = {}
@@ -1975,9 +1975,9 @@ benchmarks = {
             {'_id': "1", 'description': "Initial Setup", 'type': "header"},
             {'_id': "1.1", 'description': "Filesystem Configuration", 'type': "header"},
             {'_id': "1.1.1", 'description': "Disable unused filesystems", 'type': "header"},
-            {'_id': "1.1.1.1", 'description': "Ensure mounting of cramfs is disabled", 'function': CISAudit.audit_kernel_module_is_disabled, 'kwargs': {'modules': ['cramfs']}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "1.1.1.2", 'description': "Ensure mounting of squashfs is disabled", 'function': CISAudit.audit_kernel_module_is_disabled, 'kwargs': {'modules': ['squashfs']}, 'levels': {'server': 2, 'workstation': 2}},
-            {'_id': "1.1.1.3", 'description': "Ensure mounting of udf is disabled", 'function': CISAudit.audit_kernel_module_is_disabled, 'kwargs': {'modules': ['udf']}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "1.1.1.1", 'description': "Ensure mounting of cramfs is disabled", 'function': CISAudit.audit_kernel_module_is_disabled, 'kwargs': {'module': 'cramfs'}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "1.1.1.2", 'description': "Ensure mounting of squashfs is disabled", 'function': CISAudit.audit_kernel_module_is_disabled, 'kwargs': {'module': 'squashfs'}, 'levels': {'server': 2, 'workstation': 2}},
+            {'_id': "1.1.1.3", 'description': "Ensure mounting of udf is disabled", 'function': CISAudit.audit_kernel_module_is_disabled, 'kwargs': {'module': 'udf'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "1.1.2", 'description': 'Ensure /tmp is configured', 'function': CISAudit.audit_partition_is_separate, 'kwargs': {'partition': '/tmp'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "1.1.3", 'description': 'Ensure noexec option set on /tmp partition', 'function': CISAudit.audit_partition_option_is_set, 'kwargs': {'option': 'noexec', 'partition': '/tmp'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "1.1.4", 'description': 'Ensure nodev option set on /tmp partition', 'function': CISAudit.audit_partition_option_is_set, 'kwargs': {'option': 'nodev', 'partition': '/tmp'}, 'levels': {'server': 1, 'workstation': 1}},
@@ -2000,7 +2000,7 @@ benchmarks = {
             {'_id': "1.1.21", 'description': "Ensure nosuid option set on removable media partitions", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "1.1.22", 'description': 'Ensure sticky bit is set on all world-writable directories', 'function': CISAudit.audit_sticky_bit_on_world_writable_dirs, 'levels': {'server': 1, 'workstation': 1}, 'type': "manual"},
             {'_id': "1.1.23", 'description': "Disable Automounting", 'function': CISAudit.audit_service_is_disabled, 'kwargs': {'service': 'autofs'}, 'levels': {'server': 1, 'workstation': 2}},
-            {'_id': "1.1.24", 'description': "Disable USB Storage", 'function': CISAudit.audit_kernel_module_is_disabled, 'kwargs': {'filesystems': 'usb-storage'}, 'levels': {'server': 1, 'workstation': 2}},
+            {'_id': "1.1.24", 'description': "Disable USB Storage", 'function': CISAudit.audit_kernel_module_is_disabled, 'kwargs': {'module': 'usb-storage'}, 'levels': {'server': 1, 'workstation': 2}},
             {'_id': "1.2", 'description': "Configure Software Updates", 'type': "header"},
             {'_id': "1.2.1", 'description': "Ensure GPG keys are configured", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "1.2.2", 'description': "Ensure package manager repositories are configured", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
@@ -2035,7 +2035,7 @@ benchmarks = {
             {'_id': "1.7.5", 'description': 'Ensure permissions on /etc/issue are conigured', 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': '/etc/issue', 'expected_user': 'root', 'expected_group': 'root', 'expected_mode': '0644'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "1.7.6", 'description': 'Ensure permissions on /etc/issue.net are conigured', 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': '/etc/issue.net', 'expected_user': 'root', 'expected_group': 'root', 'expected_mode': '0644'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "1.8", 'description': "Gnome Display Manager", 'type': "header"},
-            {'_id': "1.8.1", 'description': "Ensure GNOME Display Manager is removed", 'function': CISAudit.audit_package_not_installed, 'levels': {'server': 2, 'workstation': None}},
+            {'_id': "1.8.1", 'description': "Ensure GNOME Display Manager is removed", 'function': CISAudit.audit_package_not_installed, 'levels': {'server': 2, 'workstation': None}, 'kwargs': {'package': 'gdm'}},
             {'_id': "1.8.2", 'description': "Ensure GDM login banner is configured", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "1.8.3", 'description': "Ensure last logged in user display is disabled", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "1.8.4", 'description': "Ensure XDCMP is not enabled", 'function': CISAudit.audit_xdcmp_not_enabled, 'levels': {'server': 1, 'workstation': 1}},
@@ -2136,7 +2136,7 @@ benchmarks = {
             {'_id': "4", 'description': "Logging and Auditing", 'type': "header"},
             {'_id': "4.1", 'description': "Configure System Accounting (auditd)", 'type': "header"},
             {'_id': "4.1.1", 'description': "Ensure auditing is enabled", 'type': "header"},
-            {'_id': "4.1.1.1", 'description': "Ensure auditd is installed", 'function': CISAudit.audit_package_is_installed, 'kwargs': {'packages': 'audit'}, 'levels': {'server': 2, 'workstation': 2}},
+            {'_id': "4.1.1.1", 'description': "Ensure auditd is installed", 'function': CISAudit.audit_package_is_installed, 'kwargs': {'package': 'audit'}, 'levels': {'server': 2, 'workstation': 2}},
             {'_id': "4.1.1.2", 'description': "Ensure auditd service is enabled and running", 'function': CISAudit.audit_service_is_enabled_and_is_active, 'kwargs': {'service': "auditd"}, 'levels': {'server': 2, 'workstation': 2}},
             {'_id': "4.1.1.3", 'description': "Ensure auditing for processes that start prior to auditd is enabled", 'function': CISAudit.audit_auditing_for_processes_prior_to_start_is_enabled, 'levels': {'server': 2, 'workstation': 2}},
             {'_id': "4.1.2", 'description': "Configure Data Retention", 'type': "header"},
@@ -2162,7 +2162,7 @@ benchmarks = {
             {'_id': "4.2", 'description': "Configure Logging", 'type': "header"},
             {'_id': "4.2.1", 'description': "Configure rsyslog", 'type': "header"},
             {'_id': "4.2.1.1", 'description': "Ensure rsyslog is installed", 'function': CISAudit.audit_package_is_installed, 'kwargs': {'package': "rsyslog"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "4.2.1.2", 'description': "Ensure rsyslog service is enabled and running", 'function': CISAudit.audit_service_is_enabled_and_is_active, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "4.2.1.2", 'description': "Ensure rsyslog service is enabled and running", 'function': CISAudit.audit_service_is_enabled_and_is_active, 'levels': {'server': 1, 'workstation': 1}, 'kwargs': {'service': 'rsyslog'}},
             {'_id': "4.2.1.3", 'description': "Ensure rsyslog default file permissions configured", 'function': CISAudit.audit_rsyslog_default_file_permission_is_configured, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "4.2.1.4", 'description': "Ensure logging is configured", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "4.2.1.5", 'description': "Ensure rsyslog is configured to send logs to a remote log host", 'function': CISAudit.audit_rsyslog_sends_logs_to_a_remote_log_host, 'levels': {'server': 1, 'workstation': 1}},
@@ -2281,7 +2281,7 @@ def main():  # pragma: no cover
     # test_list = audit.get_tests_list(host_os, benchmarks_version)
     test_list = benchmarks[host_os][benchmark_version]
     results = audit.run_tests(test_list)
-    audit.output(config.out_format, results)
+    audit.output(config.outformat, results)
 
 
 def parse_arguments(argv=sys.argv):
@@ -2307,7 +2307,7 @@ Examples:
 
     level_choices = [1, 2]
     log_level_choices = ['DEBUG', 'INFO', 'WARNING', 'CRITICAL']
-    output_choices = ['csv', 'json', 'text']
+    output_choices = ['csv', 'json', 'psv', 'text', 'tsv']
     system_type_choices = ['server', 'workstation']
     version_str = f'{os.path.basename(__file__)} {__version__})'
 
@@ -2327,7 +2327,9 @@ Examples:
     parser.add_argument('--outformat', action='store', choices=output_choices, default='text', help='Output type for results')
     parser.add_argument('--text', action='store_const', const='text', dest='outformat', help='Output results as text. Equivalent to --output text [default]')
     parser.add_argument('--json', action='store_const', const='json', dest='outformat', help='Output results as json. Equivalent to --output json')
-    parser.add_argument('--csv', action='store_const', const='csv', dest='outformat', help='Output results as csv. Equivalent to --output csv')
+    parser.add_argument('--csv', action='store_const', const='csv', dest='outformat', help='Output results as comma-separated values. Equivalent to --output csv')
+    parser.add_argument('--psv', action='store_const', const='psv', dest='outformat', help='Output results as pipe-separated values. Equivalent to --output psv')
+    parser.add_argument('--tsv', action='store_const', const='tsv', dest='outformat', help='Output results as tab-separated values. Equivalent to --output tsv')
     parser.add_argument('-V', '--version', action='version', version=version_str, help='Print version and exit')
     parser.add_argument('-c', '--config', action='store', help='Location of config file to load')
 

@@ -20,13 +20,14 @@ def test_csv_output(capsys):
 
     output, error = capsys.readouterr()
     assert error == ''
-    assert output.split('\n')[0] == "1,section header,,,"
-    assert output.split('\n')[1] == "1.1,subsection header,,,"
-    assert output.split('\n')[2] == "1.1.1,test 1.1.1,1,Pass,1ms"
-    assert output.split('\n')[3] == "2,section header,,,"
-    assert output.split('\n')[4] == "2.1,test 2.1,1,Fail,10ms"
-    assert output.split('\n')[5] == "2.2,test 2.2,2,Pass,100ms"
-    assert output.split('\n')[6] == "2.3,test 2.3,1,Not Implemented,"
+    assert output.split('\n')[0] == "ID,Description,Level,Result,Duration"
+    assert output.split('\n')[1] == "1,section header,,,"
+    assert output.split('\n')[2] == "1.1,subsection header,,,"
+    assert output.split('\n')[3] == "1.1.1,test 1.1.1,1,Pass,1ms"
+    assert output.split('\n')[4] == "2,section header,,,"
+    assert output.split('\n')[5] == "2.1,test 2.1,1,Fail,10ms"
+    assert output.split('\n')[6] == "2.2,test 2.2,2,Pass,100ms"
+    assert output.split('\n')[7] == "2.3,test 2.3,1,Not Implemented,"
 
 
 def test_json_output(capsys):

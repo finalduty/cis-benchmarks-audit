@@ -33,29 +33,24 @@ def mock_package_error(self, cmd):
 
 
 test = CISAudit()
+package = 'pytest'
 
 
 @patch.object(CISAudit, "_shellexec", mock_package_installed)
 def test_packages_are_installed_pass():
-    state = test.audit_package_is_installed(packages=['pytest'])
+    state = test.audit_package_is_installed(package='pytest')
     assert state == 0
 
 
 @patch.object(CISAudit, "_shellexec", mock_package_not_installed)
 def test_packages_are_installed_fail():
-    state = test.audit_package_is_installed(packages=['pytest'])
+    state = test.audit_package_is_installed(package='pytest')
     assert state == 1
-
-
-@patch.object(CISAudit, "_shellexec", mock_package_not_installed)
-def test_packages_are_installed_fail_multiple():
-    state = test.audit_package_is_installed(packages=['pytest', 'pytest2'])
-    assert state == 3
 
 
 @patch.object(CISAudit, "_shellexec", mock_package_error)
 def test_packages_are_installed_error():
-    state = test.audit_package_is_installed(packages=['pytest'])
+    state = test.audit_package_is_installed(package='pytest')
     assert state == 1
 
 
