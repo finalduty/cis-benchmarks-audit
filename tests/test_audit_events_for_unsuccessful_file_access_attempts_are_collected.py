@@ -45,4 +45,4 @@ def test_audit_events_for_unsuccessful_file_access_attempts_are_collected_fail()
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

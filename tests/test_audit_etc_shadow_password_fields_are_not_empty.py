@@ -37,4 +37,4 @@ def test_audit_etc_shadow_password_fields_are_not_empty_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

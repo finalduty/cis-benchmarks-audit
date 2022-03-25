@@ -46,4 +46,4 @@ def test_audit_system_is_disabled_when_audit_logs_are_full_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

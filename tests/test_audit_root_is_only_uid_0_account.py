@@ -37,4 +37,4 @@ def test_audit_root_is_only_uid_0_account_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

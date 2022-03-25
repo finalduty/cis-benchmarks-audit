@@ -8,12 +8,24 @@ import pytest
 from cis_audit import CISAudit
 
 
-def mock_auditing_for_processes_prior_to_start_is_enabled_pass(self, cmd):
-    if cmd.startswith('find /boot/efi/EFI'):
+def mock_auditing_for_processes_prior_to_start_is_enabled_pass_efidir(self, cmd):
+    if 'find /boot/efi/EFI' in cmd:
         stdout = ['/boot/efi/EFI/centos/grub.cfg', '']
-    elif cmd.startswith('find /boot '):
+    elif R'grep "^\s*linux"' in cmd:
+        stdout = ['PASSED', '']
+    else:
+        stdout = ['']
+
+    stderr = ['']
+    returncode = 0
+
+    return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)
+
+
+def mock_auditing_for_processes_prior_to_start_is_enabled_pass_grubdir(self, cmd):
+    if 'find /boot ' in cmd:
         stdout = ['/boot/grub2/grub.cfg', '']
-    elif 'grub.cfg' in cmd:
+    elif R'grep "^\s*linux"' in cmd:
         stdout = ['PASSED', '']
     else:
         stdout = ['']
@@ -25,7 +37,7 @@ def mock_auditing_for_processes_prior_to_start_is_enabled_pass(self, cmd):
 
 
 def mock_auditing_for_processes_prior_to_start_is_enabled_fail(self, cmd):
-    if 'grub.cfg' in cmd:
+    if R'grep "^\s*linux"' in cmd:
         stdout = ['FAILED', '']
     else:
         stdout = ['']
@@ -39,8 +51,14 @@ def mock_auditing_for_processes_prior_to_start_is_enabled_fail(self, cmd):
 test = CISAudit()
 
 
-@patch.object(CISAudit, "_shellexec", mock_auditing_for_processes_prior_to_start_is_enabled_pass)
-def test_audit_auditing_for_processes_prior_to_start_is_enabled_pass():
+@patch.object(CISAudit, "_shellexec", mock_auditing_for_processes_prior_to_start_is_enabled_pass_efidir)
+def test_audit_auditing_for_processes_prior_to_start_is_enabled_pass_efidir():
+    state = test.audit_auditing_for_processes_prior_to_start_is_enabled()
+    assert state == 0
+
+
+@patch.object(CISAudit, "_shellexec", mock_auditing_for_processes_prior_to_start_is_enabled_pass_grubdir)
+def test_audit_auditing_for_processes_prior_to_start_is_enabled_pass_grubdir():
     state = test.audit_auditing_for_processes_prior_to_start_is_enabled()
     assert state == 0
 
@@ -52,4 +70,4 @@ def test_audit_auditing_for_processes_prior_to_start_is_enabled_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

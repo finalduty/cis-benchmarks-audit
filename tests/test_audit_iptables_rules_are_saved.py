@@ -54,4 +54,4 @@ def test_audit_ip6tables_rules_are_saved_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

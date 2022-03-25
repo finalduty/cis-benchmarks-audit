@@ -51,10 +51,10 @@ def test_audit_password_hashing_algorithm_pass_regression1():
 
 
 @patch.object(CISAudit, "_shellexec", mock_password_hashing_algorithm_fail)
-def test_audit_password_hashing_algorithm_pass_fail():
+def test_audit_password_hashing_algorithm_pass_fail_empty():
     state = test.audit_password_hashing_algorithm()
     assert state == 1
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

@@ -25,4 +25,4 @@ def test_audit_at_is_restricted_to_authorized_users_fail(*args):
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

@@ -37,4 +37,4 @@ def test_audit_default_group_for_root_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

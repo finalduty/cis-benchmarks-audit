@@ -37,4 +37,4 @@ def test_audit_duplicate_group_names_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

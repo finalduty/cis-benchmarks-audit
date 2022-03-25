@@ -85,5 +85,11 @@ def test_audit_sshd_parameter_te_fail():
     assert state == 3
 
 
+@patch.object(CISAudit, "_shellexec", mock_audit_sshd_maxauthtries_fail)
+def test_audit_sshd_parameter_ne_fail():
+    state = test.audit_sshd_config_option(parameter="maxauthtries", expected_value="5", comparison="ne")
+    assert state == 3
+
+
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

@@ -42,4 +42,4 @@ def test_audit_journald_configured_to_write_logfiles_to_disk_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

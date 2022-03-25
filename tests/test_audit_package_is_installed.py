@@ -55,4 +55,4 @@ def test_packages_are_installed_error():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

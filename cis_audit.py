@@ -52,7 +52,10 @@ class CISAudit:
         self.log = logging.getLogger(__name__)
         self.log.setLevel(self.config.log_level)
 
-    def _shellexec(self, command):  # pragma: no cover
+    def _get_utcnow(self) -> datetime:
+        return datetime.utcnow()
+
+    def _shellexec(self, command: str) -> "SimpleNamespace[str, str, int]":
         """Execute shell command on the system. Supports piped commands
 
         Parameters
@@ -66,23 +69,10 @@ class CISAudit:
 
         """
 
-        try:
-            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-            output = result.stdout.decode('UTF-8').split('\n')
-            error = result.stderr.decode('UTF-8').split('\n')
-            returncode = result.returncode
-
-        except subprocess.CalledProcessError as e:
-            result = e
-
-            output = result.stdout.decode('UTF-8').split('\n')
-            error = result.stderr.decode('UTF-8').split('\n')
-            returncode = result.returncode
-
-        except FileNotFoundError as e:
-            output = ''.split('\n')
-            error = e.args[1].split('\n')
-            returncode = 1
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        output = result.stdout.decode('UTF-8').split('\n')
+        error = result.stderr.decode('UTF-8').split('\n')
+        returncode = result.returncode
 
         return SimpleNamespace(stdout=output, stderr=error, returncode=returncode)
 
@@ -260,10 +250,10 @@ class CISAudit:
         efidirfile = self._shellexec(R"find /boot/efi/EFI/ -type f -name 'grub.cfg' | grep -v BOOT").stdout[0]
         grubdirfile = self._shellexec(R"find /boot -mindepth 1 -maxdepth 2 -type f -name 'grub.cfg'").stdout[0]
 
-        if efidirfile:
+        if efidirfile != '':
             cmd = Rf'grep "^\s*linux" "{efidirfile}" | grep -Evq "audit=1\b" && echo "FAILED" || echo "PASSED"'
             r = self._shellexec(cmd)
-        elif grubdirfile:
+        elif grubdirfile != '':
             cmd = Rf'grep "^\s*linux" "{grubdirfile}" | grep -Evq "audit=1\b" && echo "FAILED" || echo "PASSED"'
             r = self._shellexec(cmd)
         else:
@@ -814,11 +804,9 @@ class CISAudit:
         ## Get file stats and user/group
         try:
             file_stat = os.stat(file)
-        except FileNotFoundError:
-            return -1
         except Exception as e:
-            self.log.warning(f'Error trying to stat file {file}: {e}')
-            return
+            self.log.warning(f'Error trying to stat file {file}: "{e}"')
+            return -1
 
         file_user = getpwuid(file_stat.st_uid).pw_name
         file_group = getgrgid(file_stat.st_gid).gr_name
@@ -880,7 +868,40 @@ class CISAudit:
 
         return state
 
-    def audit_gdm_login_banner_configured(self) -> int:  # pragma: no cover
+    def audit_gdm_last_user_logged_in_disabled(self) -> int:
+        state = 0
+
+        if self.audit_package_is_installed(package="gdm") == 0:
+            ## Test contents of /etc/dconf/profile/gdm if it exists
+            file = "/etc/dconf/profile/gdm"
+            if os.path.exists(file):
+                with open(file) as f:
+                    contents = f.read()
+                    if "user-db:user" not in contents:
+                        state += 2
+                    if "system-db:gdm" not in contents:
+                        state += 4
+                    if "file-db:/usr/share/gdm/greeter-dconf-defaults" not in contents:
+                        state += 8
+            else:
+                state += 1
+
+            ## Test contents of /etc/dconf/db/gdm.d/01-banner-message, if it exists
+            file = "/etc/dconf/db/gdm.d/01-banner-message"
+            if os.path.exists(file):
+                with open(file) as f:
+                    contents = f.read()
+                    if "[org/gnome/login-screen]\ndisable-user-list=true" not in contents:
+                        state += 32
+            else:
+                state += 16
+
+        else:
+            state = -2
+
+        return state
+
+    def audit_gdm_login_banner_configured(self) -> int:
         state = 0
 
         if self.audit_package_is_installed(package="gdm") == 0:
@@ -1107,39 +1128,6 @@ class CISAudit:
 
         return state
 
-    def audit_last_user_logged_in_disabled(self) -> int:  # pragma: no cover
-        state = 0
-
-        if self.audit_package_is_installed(package="gdm") == 0:
-            ## Test contents of /etc/dconf/profile/gdm if it exists
-            file = "/etc/dconf/profile/gdm"
-            if os.path.exists(file):
-                with open(file) as f:
-                    contents = f.read()
-                    if "user-db:user" not in contents:
-                        state += 2
-                    if "system-db:gdm" not in contents:
-                        state += 4
-                    if "file-db:/usr/share/gdm/greeter-dconf-defaults" not in contents:
-                        state += 8
-            else:
-                state += 1
-
-            ## Test contents of /etc/dconf/db/gdm.d/01-banner-message, if it exists
-            file = "/etc/dconf/db/gdm.d/01-banner-message"
-            if os.path.exists(file):
-                with open(file) as f:
-                    contents = f.read()
-                    if "[org/gnome/login-screen]\ndisable-user-list=true" not in contents:
-                        state += 32
-            else:
-                state += 16
-
-        else:
-            state = -2
-
-        return state
-
     def audit_mta_is_localhost_only(self) -> int:
         state = 0
 
@@ -1339,8 +1327,11 @@ class CISAudit:
         r1 = self.audit_package_not_installed(package)
         r2 = self.audit_service_is_masked(service)
 
-        if r1 != 0 and r2 != 0:
+        if r1 != 0:
             state += 1
+
+        if r2 != 0:
+            state += 2
 
         return state
 
@@ -1431,14 +1422,6 @@ class CISAudit:
 
         if len(r.stdout) < 2:
             state += 1
-        else:
-            regex = re.compile(R'^/etc/pam.d/system-auth:password\s+sufficient\s+pam_unix.so.*$')
-            if not regex.match(r.stdout[0]):
-                state += 2
-
-            regex = re.compile(R'^/etc/pam.d/password-auth:password\s+sufficient\s+pam_unix.so.*$')
-            if not regex.match(r.stdout[1]):
-                state += 4
 
         return state
 
@@ -1453,8 +1436,6 @@ class CISAudit:
 
         if r1.stdout[0].split('=')[1]:
             configured_inactive_days = int(r1.stdout[0].split('=')[1])
-        else:
-            configured_inactive_days = None
 
         if not configured_inactive_days <= expected_inactive_days:
             state += 1
@@ -1495,7 +1476,7 @@ class CISAudit:
 
         return state
 
-    def audit_permissions_on_private_host_key_files(self) -> int:  # pragma: no query
+    def audit_permissions_on_private_host_key_files(self) -> int:
         state = 0
         counter = 0
         files = []
@@ -1504,22 +1485,21 @@ class CISAudit:
         cmd = R"/usr/sbin/sshd -T"
         r = self._shellexec(cmd)
 
+        regex = re.compile(R'^hostkey\s')
         for line in r.stdout:
-            if line.startswith(R'hostkey\s'):
-                files.append(line.split[1])
+            if regex.match(line):
+                files.append(line.split()[1])
 
         ## Check file permissions using audit_file_permissions()
-        for file in files:
-            result = self.audit_file_permissions(file=file.name, expected_user="root", expected_group="root", expected_mode="0600")
+        for counter, file in enumerate(files):
+            result = self.audit_file_permissions(file=file, expected_user="root", expected_group="root", expected_mode="0600")
 
             if result != 0:
                 state += 2**counter
-
-            counter += 1
 
         return state
 
-    def audit_permissions_on_public_host_key_files(self) -> int:  # pragma: no query
+    def audit_permissions_on_public_host_key_files(self) -> int:
         state = 0
         counter = 0
         files = []
@@ -1528,18 +1508,17 @@ class CISAudit:
         cmd = R"/usr/sbin/sshd -T"
         r = self._shellexec(cmd)
 
+        regex = re.compile(R'^hostkey\s')
         for line in r.stdout:
-            if line.startswith(R'hostkey\s'):
-                files.append(line.split[1])
+            if regex.match(line):
+                files.append(line.split()[1])
 
         ## Check file permissions using audit_file_permissions()
-        for file in files:
-            result = self.audit_file_permissions(file=file.name + '.pub', expected_user="root", expected_group="root", expected_mode="0644")
+        for counter, file in enumerate(files):
+            result = self.audit_file_permissions(file=file + '.pub', expected_user="root", expected_group="root", expected_mode="0644")
 
             if result != 0:
                 state += 2**counter
-
-            counter += 1
 
         return state
 
@@ -1571,12 +1550,9 @@ class CISAudit:
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        regex1 = re.compile(R'\*\.\*\s+action\(type="omfwd" target="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" port="514" protocol="tcp" action.resumeRetryCount="[0-9]+" queue.type="LinkedList" queue.size="[0-9]+"\)')
-        regex2 = re.compile(R'\*\.\*\s+@@[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
-
-        if regex1.match(r1.stdout[0]):
+        if r1.stdout[0] != '':
             state = 0
-        elif regex2.match(r2.stdout[0]):
+        elif r2.stdout[0] != '':
             state = 0
         else:
             state = 1
@@ -1613,21 +1589,22 @@ class CISAudit:
 
         return state
 
-    def audit_selinux_not_disabled_in_bootloader(self):  # pragma: no cover
+    def audit_selinux_not_disabled_in_bootloader(self) -> int:
         state = 0
         file_paths = []
-        for root, dirs, files in os.walk('/boot/'):
-            if "grub.cfg" in files:
-                file_paths.append(root)
+        for dirpath, dirnames, filenames in os.walk('/boot/'):
+            if "grub.cfg" in filenames:
+                file_paths.append(dirpath)
 
         if len(file_paths) == 0:
-            state += 1
+            state = -1
+
         else:
             for i, path in enumerate(file_paths):
                 cmd = Rf'grep "^\s*linux" {path}/grub.cfg | grep -E "selinux=0|enforcing=0"'
                 r = self._shellexec(cmd)
 
-                if r.stdout != "":
+                if r.stdout != ['']:
                     state += 2 ** (i + 1)
 
         return state
@@ -1914,7 +1891,7 @@ class CISAudit:
 
             ## If a test doesn't have a function associated with it, we assume it's unimplemented
             if test_type == 'test' and test_function is None:
-                test_type = 'unimplemented'
+                test_type = 'notimplemented'
 
             ## Check whether this test_id is included
             if self._test_is_included(test_id, test_level):
@@ -1927,11 +1904,11 @@ class CISAudit:
                 elif test_type == 'skip':
                     results.append((test_id, test_description, test_level, 'Skipped'))
 
-                elif test_type == 'unimplemented':
+                elif test_type == 'notimplemented':
                     results.append((test_id, test_description, test_level, 'Not Implemented'))
 
                 elif test_type == 'test':
-                    start_time = datetime.now()
+                    start_time = self._get_utcnow()
 
                     try:
                         if kwargs:
@@ -1945,7 +1922,7 @@ class CISAudit:
                         self.log.warning(f'Test {test_id} encountered an error: "{e}"')
                         state = -1
 
-                    end_time = datetime.now()
+                    end_time = self._get_utcnow()
                     duration = f'{int((end_time.microsecond - start_time.microsecond) / 1000)}ms'
 
                     if state == 0:
@@ -1960,10 +1937,6 @@ class CISAudit:
                         result = "Fail"
 
                     results.append((test_id, test_description, test_level, result, duration))
-
-                else:
-                    self.log.critical(f'Test {test_id} did not have a type or function specified')
-                    result = "Error"
 
         return results
 

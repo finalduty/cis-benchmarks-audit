@@ -42,4 +42,4 @@ def test_audit_journald_configured_to_compress_large_logs_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

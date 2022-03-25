@@ -72,4 +72,4 @@ def test_audit_password_inactive_lock_is_disabled_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

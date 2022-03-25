@@ -61,4 +61,4 @@ def test_audit_ip6tables_outbound_and_established_ipv4_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

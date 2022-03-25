@@ -43,4 +43,4 @@ def test_audit_events_for_login_and_logout_are_collected_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

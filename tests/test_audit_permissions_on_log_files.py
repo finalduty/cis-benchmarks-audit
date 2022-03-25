@@ -42,4 +42,4 @@ def test_audit_permissions_on_log_files_are_configured_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

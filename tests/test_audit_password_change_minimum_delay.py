@@ -51,4 +51,4 @@ def test_audit_password_expiration_min_days_is_configured_pass_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

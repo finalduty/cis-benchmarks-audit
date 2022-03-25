@@ -40,4 +40,4 @@ def test_audit_password_reuse_is_limited_pass_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

@@ -3,7 +3,7 @@
 import pytest
 import cis_audit
 from datetime import datetime
-from unittest.mock import patch, Mock
+from unittest.mock import patch
 
 
 def mock_run_tests_pass(*args, **kwargs):
@@ -30,7 +30,11 @@ def mock_run_tests_exception(*args, **kwargs):
     raise Exception
 
 
-@patch.object(cis_audit, 'datetime', Mock(wraps=datetime))
+def mock_datetime_utcnow(offset=0):
+    return datetime(year=1, month=1, day=1)
+
+
+@patch.object(cis_audit.CISAudit, '_get_utcnow', mock_datetime_utcnow)
 class TestRunTests:
     test = cis_audit.CISAudit()
 
@@ -115,6 +119,13 @@ class TestRunTests:
         result = self.test.run_tests([test_args])
         assert result == [(test_args['_id'], test_args["description"], test_args['levels']['server'], 'Skipped')]
 
+    def test_run_tests_error_not_implemented(self, caplog):
+        test_args = self.test_args.copy()
+        test_args.pop('type')
+
+        result = self.test.run_tests([test_args])
+        assert result == [(test_args['_id'], test_args["description"], test_args['levels']['server'], 'Not Implemented')]
+
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

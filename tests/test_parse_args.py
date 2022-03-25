@@ -212,5 +212,18 @@ def test_parse_arg_json(caplog):
     assert status
 
 
+def test_parse_arg_system_type_workstation(caplog):
+    args = [path.relpath(__file__), '--debug', '--workstation']
+    cis_audit.parse_arguments(argv=args)
+    status = False
+
+    for record in caplog.records:
+        if record.msg == 'Going to use "workstation" levels for test determination':
+            status = True
+            break
+
+    assert status
+
+
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

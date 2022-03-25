@@ -63,4 +63,4 @@ def test_audit_access_to_su_command_is_restricted_fail_with_users_in_group():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

@@ -40,4 +40,4 @@ def test_audit_audit_logs_not_automatically_deleted_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

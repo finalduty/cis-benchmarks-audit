@@ -47,4 +47,4 @@ def test_audit_events_for_discretionary_access_control_changes_are_collected_fai
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

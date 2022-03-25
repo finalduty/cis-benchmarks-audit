@@ -67,4 +67,4 @@ def test_audit_ip6tables_loopback_is_configured_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

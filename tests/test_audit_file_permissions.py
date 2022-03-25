@@ -22,6 +22,12 @@ class MockFilePermissions:
         return SimpleNamespace(st_mode=mode, st_ino=28399, st_dev=1, st_nlink=1, st_uid=uid, st_gid=gid, st_size=4096, st_atime=1644784040, st_mtime=1644784040, st_ctime=1644784040)
 
 
+class MockFileNotFoundError:
+    def stat(file, **kwargs):
+        print(file, file)
+        raise FileNotFoundError(2, 'No such file or directory', '/pytest')
+
+
 def mock_uid_gid(id):
     if id == 0:
         name = 'root'
@@ -82,6 +88,13 @@ class TestFilePermissionErrors:
         with pytest.raises(ValueError) as e:
             assert self.test.audit_file_permissions(file=self.file, expected_user=self.user, expected_group=self.group, expected_mode=mode)
         assert str(e.value) == f'The "expected_mode" for {self.file} should be 3 or 4 characters long, not {len(mode)}'
+
+    @patch.object(cis_audit, "os", MockFileNotFoundError)
+    def test_file_permissions_error_file_not_found(self, caplog, capsys):
+        mode = '0644'
+        state = self.test.audit_file_permissions(file=self.file, expected_user=self.user, expected_group=self.group, expected_mode=mode)
+        assert state == -1
+        assert caplog.records[0].msg == f'Error trying to stat file {self.file}: "[Errno 2] No such file or directory: \'/pytest\'"'
 
 
 @patch.object(cis_audit, "getgrgid", mock_uid_gid)
@@ -215,4 +228,4 @@ class TestFilePermissionFailureStates:
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])

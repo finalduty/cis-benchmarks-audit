@@ -49,4 +49,4 @@ def test_iptables_is_flushed_fail():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__])
+    pytest.main([__file__, '--no-cov'])
