@@ -63,5 +63,6 @@ class TestFilesystemIntegrityRegularlyChecked:
         state = self.test.audit_filesystem_integrity_regularly_checked()
         assert state == 1
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

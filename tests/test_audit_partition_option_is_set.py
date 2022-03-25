@@ -43,5 +43,6 @@ class TestPartitionOptions:
         state = self.test.audit_partition_option_is_set(partition=self.partition, option=self.option)
         assert state == 1
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

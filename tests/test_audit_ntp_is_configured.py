@@ -62,5 +62,6 @@ class TestNTPIsConfigured:
         state = self.test.audit_ntp_is_configured()
         assert state == 31
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

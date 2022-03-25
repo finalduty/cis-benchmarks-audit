@@ -38,5 +38,6 @@ class TestSELinuxPolicyConfigured:
         state = self.test.audit_selinux_policy_is_configured()
         assert state == 3
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

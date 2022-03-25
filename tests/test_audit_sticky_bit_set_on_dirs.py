@@ -48,5 +48,6 @@ class TestPartitionOptions:
         state = self.test.audit_sticky_bit_on_world_writable_dirs()
         assert state == 1
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

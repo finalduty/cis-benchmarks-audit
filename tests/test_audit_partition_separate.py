@@ -40,5 +40,6 @@ class TestPartitionSeparate:
         state = self.test.audit_partition_is_separate(partition=self.partition)
         assert state == 1
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

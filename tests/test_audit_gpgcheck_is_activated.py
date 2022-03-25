@@ -88,5 +88,6 @@ class TestGPGCheckActivated:
         state = self.test.audit_gpgcheck_is_activated()
         assert state == 3
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

@@ -51,5 +51,6 @@ class TestSELinuxNotDisabled:
         state = self.test.audit_selinux_mode_not_disabled()
         assert state == 3
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

@@ -42,5 +42,6 @@ class TestCoreDumpsRestricted:
         state = self.test.audit_core_dumps_restricted()
         assert state == 7
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

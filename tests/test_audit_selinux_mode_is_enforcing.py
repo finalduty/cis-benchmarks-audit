@@ -51,5 +51,6 @@ class TestSELinuxIsEnforcing:
         state = self.test.audit_selinux_mode_is_enforcing()
         assert state == 3
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

@@ -40,6 +40,7 @@ def mock_iptables_loopback_is_configured_fail(self, cmd):
 
 test = CISAudit()
 
+
 ## IPv4
 @patch.object(CISAudit, "_shellexec", mock_iptables_loopback_is_configured_pass)
 def test_audit_iptables_loopback_is_configured_pass():

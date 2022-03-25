@@ -49,5 +49,6 @@ class TestSysctlFlagsAreSet:
         state = self.test.audit_sysctl_flags_are_set(self.flags, value)
         assert state == 15
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

@@ -38,5 +38,6 @@ class TestMTAIsLocalhost:
         state = self.test.audit_mta_is_localhost_only()
         assert state == 1
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

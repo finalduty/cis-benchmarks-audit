@@ -47,5 +47,6 @@ class TestServiceDisabled:
         state = self.test.audit_service_is_disabled(self.test_service)
         assert state == 1
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

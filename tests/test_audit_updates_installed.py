@@ -42,5 +42,6 @@ class TestUpdatesInstalled:
         state = self.test.audit_updates_installed()
         assert state == 1
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

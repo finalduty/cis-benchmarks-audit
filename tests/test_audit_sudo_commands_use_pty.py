@@ -42,5 +42,6 @@ class TestSudoCommandUsePty:
         state = self.test.audit_sudo_commands_use_pty()
         assert state == 1
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

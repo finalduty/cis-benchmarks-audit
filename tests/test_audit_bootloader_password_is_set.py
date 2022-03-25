@@ -54,5 +54,6 @@ class TestBootloaderPasswordSet:
         state = self.test.audit_bootloader_password_is_set()
         assert state == 1
 
+
 if __name__ == '__main__':
     pytest.main([__file__, '--no-cov'])

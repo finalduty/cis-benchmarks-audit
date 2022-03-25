@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-from types import SimpleNamespace
-from unittest.mock import patch
 import cis_audit
 import pytest
 
