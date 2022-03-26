@@ -1,55 +1,95 @@
 # CIS Benchmarks Audit
 <p>
-<a href="https://github.com/finalduty/cis-benchmarks-audit/tags"><img alt="Latest version" src="https://img.shields.io/github/v/tag/finalduty/cis-benchmarks-audit?include_prereleases&label=latest&logo=python"></a>
-<a href="https://github.com/finalduty/cis-benchmarks-audit/actions/workflows/build.yml"><img alt="GitHub Actions" src="https://github.com/finalduty/cis-benchmarks-audit/actions/workflows/build.yml/badge.svg"></a>
-<a href="https://github.com/finalduty/cis-benchmarks-audit/blob/main/LICENSE"><img alt="License Apache-2.0" src="https://img.shields.io/github/license/finalduty/cis-benchmarks-audit"></a>
-<a href="https://www.codefactor.io/repository/github/finalduty/cis-benchmarks-audit/badge"><img alt="CodeFactor" src="https://www.codefactor.io/repository/github/finalduty/cis-benchmarks-audit/badge"></a>
-<a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
+  <a href="https://github.com/finalduty/cis-benchmarks-audit/tags">
+    <img alt="Latest version" src="https://img.shields.io/github/v/tag/finalduty/cis-benchmarks-audit?include_prereleases&label=latest&logo=python">
+  </a>
+  <a href="https://github.com/finalduty/cis-benchmarks-audit/actions/workflows/ci_tests.yml">
+    <img alt="GitHub Actions" src="https://github.com/finalduty/cis-benchmarks-audit/actions/workflows/ci_tests.yml/badge.svg">
+  </a>
+  <a href="https://github.com/finalduty/cis-benchmarks-audit/blob/main/LICENSE">
+    <img alt="License Apache-2.0" src="https://img.shields.io/github/license/finalduty/cis-benchmarks-audit">
+  </a>
+  <a href="https://codecov.io/gh/finalduty/cis-benchmarks-audit">
+    <img src="https://codecov.io/gh/finalduty/cis-benchmarks-audit/branch/main/graph/badge.svg?token=BAFVN48B40"/>
+  </a>
+  <a href="https://www.codefactor.io/repository/github/finalduty/cis-benchmarks-audit/badge">
+    <img alt="CodeFactor" src="https://www.codefactor.io/repository/github/finalduty/cis-benchmarks-audit/badge">
+  </a>
+  <a href="https://github.com/psf/black">
+    <img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg">
+  </a>
 </p>
 
-This repo contains a bash script which performs tests against your CentOS system to give an indication of whether the running server may compliy with the CIS v2.2.0 Benchmarks for CentOS. https://learn.cisecurity.org/benchmarks
+This repo contains a python3 script which audits for conformance of your system against the CIS Hardening Benchmarks
 
-_Only CentOS 7 is supported at this time._
+**Supported Versions:**
+OS|Benchmark Versions|Python Version
+---|---|---
+CentOS 7|3.1.2|3.6
+
 https://www.cisecurity.org/cis-securesuite/cis-securesuite-membership-terms-of-use/
 ### How do I use this?
 #### Download:
 
-    curl -LO https://raw.githubusercontent.com/finalduty/cis_benchmarks_audit/master/cis-audit.sh && chmod 750 cis-audit.sh
+    curl -LO https://raw.githubusercontent.com/finalduty/cis_benchmarks_audit/main/cis_audit.py && chmod 750 cis_audit.py
 
 #### Run: 
 ```
-# ./cis-audit.sh --help
-This script runs tests on the system to check for compliance against the CIS CentOS 7 Benchmarks.
-No changes are made to system files by this script.
+#usage: cis_audit.py [-h] [--level {1,2}] [--include INCLUDES [INCLUDES ...]]
+                    [--exclude EXCLUDES [EXCLUDES ...]]
+                    [-l {DEBUG,INFO,WARNING,CRITICAL}] [--debug] [--nice]
+                    [--no-nice] [--no-colour]
+                    [--system-type {server,workstation}] [--server]
+                    [--workstation] [--outformat {csv,json,psv,text,tsv}]
+                    [--text] [--json] [--csv] [--psv] [--tsv] [-V] [-c CONFIG]
 
-  Options:
-    -h,  --help                  Prints this help text
-         --debug                 Run script with debug output turned on
-         --level (1,2)           Run tests for the specified level only
-         --include "<test_ids>"  Space delimited list of tests to include
-         --exclude "<test_ids>"  Space delimited list of tests to exclude
-         --nice                  Lowers the CPU priority of executing tests
-         --no-colour             Disable colouring for STDOUT (Note that output redirected to a file/pipe is never coloured)
+This script runs tests on the system to check for compliance against the CIS Benchmarks. No changes are made to system files by this script.
 
-  Examples:
-  
+optional arguments:
+  -h, --help            show this help message and exit
+  --level {1,2}         Run tests for the specified level only
+  --include INCLUDES [INCLUDES ...]
+                        Space delimited list of tests to include
+  --exclude EXCLUDES [EXCLUDES ...]
+                        Space delimited list of tests to exclude
+  -l {DEBUG,INFO,WARNING,CRITICAL}, --log-level {DEBUG,INFO,WARNING,CRITICAL}
+                        Set log output level
+  --debug               Run script with debug output turned on. Equivalent to --log-level DEBUG
+  --nice                Lower the CPU priority for test execution. This is the default behaviour.
+  --no-nice             Do not lower CPU priority for test execution. This may make the tests complete faster but at the cost of putting a higher load on the server. Setting this overrides the --nice option.
+  --no-colour, --no-color
+                        Disable colouring for STDOUT. Output redirected to a file/pipe is never coloured.
+  --system-type {server,workstation}
+                        Set which test level to reference
+  --server              Use "server" levels to determine which tests to run. Equivalent to --system-type server [Default]
+  --workstation         Use "workstation" levels to determine which tests to run. Equivalent to --system-type workstation
+  --outformat {csv,json,psv,text,tsv}
+                        Output type for results
+  --text                Output results as text. Equivalent to --output text [default]
+  --json                Output results as json. Equivalent to --output json
+  --csv                 Output results as comma-separated values. Equivalent to --output csv
+  --psv                 Output results as pipe-separated values. Equivalent to --output psv
+  --tsv                 Output results as tab-separated values. Equivalent to --output tsv
+  -V, --version         Print version and exit
+  -c CONFIG, --config CONFIG
+                        Location of config file to load
+
+Examples:
+    
+    Run with debug enabled:
+    ./cis_audit.py --debug
+        
     Exclude tests from section 1.1 and 1.3.2:
-      cis-audit.sh --exclude "1.1 1.3.2"
-      
-    Include tests only from section 4.1 but exclude tests from subsection 4.1.1:
-      cis-audit.sh --include 4.1 --exclude 4.1.1
-    
+    ./cis_audit.py --exclude 1.1 1.3.2
+        
+    Include tests only from section 4.1 but exclude tests from section 4.1.1:
+    ./cis_audit.py --include 4.1 --exclude 4.1.1
+        
     Run only level 1 tests
-      cis-audit.sh --level 1
-    
+    ./cis_audit.py --level 1
+        
     Run level 1 tests and include some but not all SELinux questions
-      cis-audit.sh --level 1 --include 1.6 --exclude 1.6.1.2
-
-    Email output to email@example.com
-      cis-audit.sh --level 1 | mail -s "CIS Audit Report on $HOSTNAME" email@example.com
-      
-    Display only Failed tests
-      cis-audit.sh --level 1 | grep Fail
+    ./cis_audit.py --level 1 --include 1.6 --exclude 1.6.1.2
 
 ```
 
@@ -85,59 +125,11 @@ ID      Description                                                Scoring  Leve
 Passed 13 of 15 tests in 1 seconds (1 Skipped, 0 Errors)
 ```
 
-### Notes / Caveats
-#### Test 3.7
-> _3.7 - Ensure wireless interfaces are disabled (Not Scored)_  
-
-This test deviates from the audit steps specified in the standard. The assumption here is that if you are on a server then you shouldn't have the `wireless-tools` package installed so you wouldn't even be able to use any wireless interfaces, and if you're on a laptop, you almost certainly do want wireless access.
-
-#### Tests 4.1.4 to 4.1.17
-> _4.1.4 - Ensure events that modify date and time information are collected (Scored)_  
-> _4.1.5 - Ensure events that modify user/group information are collected (Scored)_  
-> _4.1.6 - Ensure events that modify the system's network environment are collected (Scored)_  
-> _4.1.7 - Ensure events that modify the system's Mandatory Access Controls are collected (Scored)_  
-> _4.1.8 - Ensure login and logout events are collected (Scored)_  
-> _4.1.9 - Ensure session initiation information is collected (Scored)_  
-> _4.1.10 - Ensure discretionary access control permission modification events are collected (Scored)_  
-> _4.1.11 - Ensure unsuccessful unauthorized file access attempts are collected (Scored)_  
-> _4.1.12 - Ensure use of privileged commands is collected (Scored)_  
-> _4.1.13 - Ensure successful file system mounts are collected (Scored)_  
-> _4.1.14 - Ensure file deletion events by users are collected (Scored)_  
-> _4.1.15 - Ensure changes to system administration scope (sudoers) is collected (Scored)_  
-> _4.1.16 - Ensure system administrator actions (sudolog) are collected (Scored)_  
-> _4.1.17 - Ensure kernel module loading and unloading is collected (Scored)_  
-
-The way that the tests are described in v2.2.0 of the standard do not directly reflect what is returned when querying the system. As such, the 'expected' output for these tests differs slightly to what is defined in the standard.
-
-Users will find that when applying the recommended configurations per the standard, that the verify command displays it slightly differently. For instance, in `4.1.4`, when applying the recommendations as below:
-```
--a always,exit -F arch=b32 -S adjtimex -S settimeofday -S stime -k time-change
--a always,exit -F arch=b32 -S clock_settime -k time-change
-```
-
-The output from `auditctl -l` actually shows:
-```
--a always,exit -F arch=b64 -S adjtimex,settimeofday -F key=time-change
--a always,exit -F arch=b32 -S stime,settimeofday,adjtimex -F key=time-change
-```
-
-#### Tests 4.1.8 & 4.1.9
-> _4.1.8 - Ensure login and logout events are collected (Scored)_  
-> _4.1.9 - Ensure session initiation information is collected (Scored)_  
-
-The way the v2.2.0 standard lists the requirements to pass `4.1.8` and `4.1.9` conflicts with each other when looking at the 'logins' terms used.
-
-This tool deviates from the standard here and includes the 'logins' portions of `4.1.9` in the tests for `4.1.8` instead of the ones specified in the standard. It is anticipated that users going for compliance against these two recommendations would do so at the same time and therefore should not notice any difference between the test results and the standard.
-
-#### Test 5.4.4 
-The standard recommends that umask permissions be set to 027 or higher. Currently this test only checks for 027, so a more restrictive umask such as 077 would fail. Further, it does not test the /etc/profile/*.sh files on the system.
-
-I will leave it this way until someone needs a more restrictive umask test - Just add an issue if this is you 👍
 
 ### Disclaimer:
 This is not a replacement for a full audit and a passing result from this script does not necessarily mean that you are compliant (but it should give you a good idea of where to start).  
 
-The script will never make changes to your system, but it will write temporary data to to /tmp/.cis-audit* (which is cleaned up afterwards).  
+The script will never make changes to your system.
 
 This script can run multiple tests at a time and it is possible that some tests could have an adverse impact on your system(s). There is an adjustable limit for the number of concurrent tests as well as a nicing argument which can help keep load down.  
 
