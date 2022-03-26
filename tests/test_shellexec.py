@@ -22,7 +22,7 @@ def test_shellexec_sterr_pass():
 def test_shellexec_sterr_error():
     result = test._shellexec('error pytest')
     assert result.returncode == 127
-    assert result.stderr[0] == '/bin/sh: error: command not found'
+    assert result.stderr[0] in ['/bin/sh: error: command not found', '/bin/sh: 1: error: not found']
     assert result.stdout[0] == ''
 
 
