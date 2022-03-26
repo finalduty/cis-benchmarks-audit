@@ -1,23 +1,15 @@
 #!/usr/bin/env python3
 
-## Copyright 2022 Andy Dustin <andy.dustin@gmail.com>
-##
-## Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-## in compliance with the License. You may obtain a copy of the License at
-##
-## http://www.apache.org/licenses/LICENSE-2.0
-##
-## Unless required by applicable law or agreed to in writing, software distributed under the License is
-## distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-## See the License for the specific language governing permissions and limitations under the License.
+# Copyright (C) 2022 Andy Dustin <andy.dustin@gmail.com>
+# This work is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
+# https://creativecommons.org/licenses/by-nc-sa/4.0/
 
-## This script checks for compliance against CIS CentOS Linux 7 Benchmark v2.1.1 2017-01-31 measures
-## Each individual standard has it's own function and is forked to the background, allowing for
-## multiple tests to be run in parallel, reducing execution time.
-##
-## You can obtain a copy of the CIS Benchmarks from https://www.cisecurity.org/cis-benchmarks/
+# This unofficial tool checks for your system against published CIS Hardening Benchmarks and offers an indication of your system's preparedness for compliance to the official standard.
 
-__version__ = '0.20.0-alpha1+83522f24'
+# You can obtain a copy of the CIS Benchmarks from https://www.cisecurity.org/cis-benchmarks/
+# Use of the CIS Benchmarks are subject to the Terms of Use for Non-Member CIS Products - https://www.cisecurity.org/terms-of-use-for-non-member-cis-products
+
+__version__ = '0.20.0-alpha.1'
 
 ### Imports ###
 import json  # https://docs.python.org/3/library/json.html

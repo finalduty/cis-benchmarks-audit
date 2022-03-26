@@ -7,7 +7,7 @@
     <img alt="GitHub Actions" src="https://github.com/finalduty/cis-benchmarks-audit/actions/workflows/ci_tests.yml/badge.svg">
   </a>
   <a href="https://github.com/finalduty/cis-benchmarks-audit/blob/main/LICENSE">
-    <img alt="License Apache-2.0" src="https://img.shields.io/github/license/finalduty/cis-benchmarks-audit">
+    <img alt="License" src="https://img.shields.io/github/license/finalduty/cis-benchmarks-audit">
   </a>
   <a href="https://codecov.io/gh/finalduty/cis-benchmarks-audit">
     <img src="https://codecov.io/gh/finalduty/cis-benchmarks-audit/branch/main/graph/badge.svg?token=BAFVN48B40"/>
@@ -20,20 +20,15 @@
   </a>
 </p>
 
-This repo contains a python3 script which audits for conformance of your system against the CIS Hardening Benchmarks
+This repo provides an unofficial, standalone, zero-install, zero-dependency, Python 3 application which can check your system against published CIS Hardening Benchmarks to offer an indication of your system's preparedness for compliance to the official standard.
 
-**Supported Versions:**
-OS|Benchmark Versions|Python Version
----|---|---
-CentOS 7|3.1.2|3.6
 
-https://www.cisecurity.org/cis-securesuite/cis-securesuite-membership-terms-of-use/
 ### How do I use this?
 #### Download:
 
     curl -LO https://raw.githubusercontent.com/finalduty/cis_benchmarks_audit/main/cis_audit.py && chmod 750 cis_audit.py
 
-#### Run: 
+#### Run
 ```
 #usage: cis_audit.py [-h] [--level {1,2}] [--include INCLUDES [INCLUDES ...]]
                     [--exclude EXCLUDES [EXCLUDES ...]]
@@ -125,12 +120,33 @@ ID      Description                                                Scoring  Leve
 Passed 13 of 15 tests in 1 seconds (1 Skipped, 0 Errors)
 ```
 
+### Supported Versions
+OS|Benchmark Versions|Python Version
+---|---|---
+CentOS 7|3.1.2|3.6
 
-### Disclaimer:
+
+### Caveats
+#### Terms of Use
+Use of the CIS Benchmarks are subject to the [Terms of Use for Non-Member CIS Products](https://www.cisecurity.org/terms-of-use-for-non-member-cis-products)
+
+
+#### CentOS 7 & Python 3
+Whilst this repo intends to follow a zero dependency approach, it is not practical to support Python 2.7, which is what is installed by default on CentOS 7. You can however easily install Python 3.6 via yum, which I hope is ok for your environment:
+```
+$ sudo yum install python3 -y
+```
+
+### Disclaimer
 This is not a replacement for a full audit and a passing result from this script does not necessarily mean that you are compliant (but it should give you a good idea of where to start).  
 
-The script will never make changes to your system.
+_No warranty is offered and no responsibility will be taken for damage to systems resulting from the use of this tool._
 
-This script can run multiple tests at a time and it is possible that some tests could have an adverse impact on your system(s). There is an adjustable limit for the number of concurrent tests as well as a nicing argument which can help keep load down.  
+### License
+This work is licensed under a [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License][cc-by-nc-sa].
 
-_No warranty is offered and no responsibility will be taken for damage to systems resulting from the use of this script._
+[![CC BY-NC-SA 4.0][cc-by-nc-sa-image]][cc-by-nc-sa]
+
+[cc-by-nc-sa]: http://creativecommons.org/licenses/by-nc-sa/4.0/
+[cc-by-nc-sa-image]: https://licensebuttons.net/l/by-nc-sa/4.0/88x31.png
+[cc-by-nc-sa-shield]: https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg
