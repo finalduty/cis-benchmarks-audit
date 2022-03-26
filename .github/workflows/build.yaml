@@ -1,0 +1,51 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: Build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.6']
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pipenv
+          pipenv lock -r --dev > requirements.txt
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Lint with flake8
+        run: |
+          flake8 *.py
+          flake8 tests/*.py
+
+      - name: Format with black
+        run: |
+          black --check cis_audit.py
+          black --check tests/*.py
+
+      - name: Test with pytest
+        run: |
+          pytest
+          coverage xml
+
+      - name: Codecov
+        # You may pin to the exact commit or the version.
+        # uses: codecov/codecov-action@f32b3a3741e1053eb607407145bc9619351dc93b
+        uses: codecov/codecov-action@v2.1.0
+        with:
+          files: coverage.xml

@@ -1,0 +1,13 @@
+[flake8]
+max-line-length = 9999
+ignore = 
+    E501 E265 E266
+    W293 E203
+
+select = C,E,F,W,B,B901
+exclude =
+    .archive,
+    .git,
+    __pycache__,
+    build,
+    dist,
