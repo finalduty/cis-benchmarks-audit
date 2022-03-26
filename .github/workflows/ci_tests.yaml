@@ -41,3 +41,11 @@ jobs:
       - name: Test with pytest
         run: |
           pytest
+          coverage xml
+          
+      - name: Codecov
+        # You may pin to the exact commit or the version.
+        # uses: codecov/codecov-action@f32b3a3741e1053eb607407145bc9619351dc93b
+        uses: codecov/codecov-action@v2.1.0
+        with:
+          files: coverage.xml
