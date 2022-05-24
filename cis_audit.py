@@ -1105,7 +1105,7 @@ class CISAudit:
         cmd = f'modprobe -n -v {module} | grep -E "({module}|install)"'
         r = self._shellexec(cmd)
 
-        if r.stdout[0] == 'install /bin/true\n':
+        if r.stdout[0] == 'install /bin/true ':
             pass
         elif r.stderr[0] == f'modprobe: FATAL: Module {module} not found.\n':
             pass
