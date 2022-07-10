@@ -1291,6 +1291,24 @@ class CISAudit:
 
         return state
 
+    def audit_only_one_package_is_installed(self, packages: str) -> int:
+        ### Similar to audit_package_is_installed but requires one of many packages is installed
+        cmd = f'rpm -q {packages} | grep -v "not installed"'
+        r = self._shellexec(cmd)
+
+        print(r.stdout)
+        ## The length of stdout should be two because a newline is output as well.
+        ## e.g. print(r.stdout) will show:
+        ##      ['chrony-3.4-1.el7.x86_64', '']
+        ##      ['chrony-3.4-1.el7.x86_64', 'ntp-4.2.6p5-29.el7.centos.2.x86_64', '']
+
+        if len(r.stdout) == 2 and r.stdout[1] == "":
+            state = 0
+        else:
+            state = 1
+
+        return state
+
     def audit_package_is_installed(self, package: str) -> int:
         cmd = f'rpm -q {package}'
         r = self._shellexec(cmd)
@@ -2024,7 +2042,7 @@ benchmarks = {
             {'_id': "2.1.1", 'description': "Ensure xinetd is not installed", 'function': CISAudit.audit_package_not_installed, 'kwargs': {'package': 'xinetd'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.2", 'description': "Special Purpose Services", 'type': "header"},
             {'_id': "2.2.1", 'description': "Time Synchronization", 'type': "header"},
-            {'_id': "2.2.1.1", 'description': "Ensure time synchronisation is in use", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "2.2.1.1", 'description': "Ensure time synchronisation is in use", 'function': CISAudit.audit_only_one_package_is_installed, 'kwargs': {'packages': "chrony ntp"}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.2.1.2", 'description': "Ensure chrony is configured", 'function': CISAudit.audit_chrony_is_configured, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.2.1.3", 'description': "Ensure ntp is configured", 'function': CISAudit.audit_ntp_is_configured, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.2.2", 'description': 'Ensure X11 Server components are not installed', 'function': CISAudit.audit_package_not_installed, 'kwargs': {'package': 'xorg-x11-server*'}, 'levels': {'server': 1, 'workstation': None}},
