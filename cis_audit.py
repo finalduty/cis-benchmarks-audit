@@ -1813,9 +1813,6 @@ class CISAudit:
         passwd_file = self._shellexec('cat /etc/passwd').stdout
 
         for line in passwd_file:
-            if line == '':
-                continue
-
             user = line.split(':')[0]
             uid = int(line.split(':')[2])
             shell = line.split(':')[6]
