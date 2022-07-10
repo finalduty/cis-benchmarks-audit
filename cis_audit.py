@@ -417,6 +417,20 @@ class CISAudit:
 
         return state
 
+    def audit_etc_passwd_gids_exist_in_etc_group(self) -> int:
+        gids_from_etc_group = self._shellexec("awk -F: '{print $3}' /etc/group | sort -un").stdout
+        gids_from_etc_passwd = self._shellexec("awk -F: '{print $4}' /etc/passwd | sort -un").stdout
+        state = 0
+
+        print(gids_from_etc_group)
+        print(gids_from_etc_passwd)
+        for gid in gids_from_etc_passwd:
+            if gid not in gids_from_etc_group:
+                self.log.warning(f'GID {gid} exists in /etc/passwd but not in /etc/group')
+                state = 1
+
+        return state
+
     def audit_etc_shadow_password_fields_are_not_empty(self) -> int:
         state = 0
 
@@ -2277,7 +2291,7 @@ benchmarks = {
             {'_id': "6.2", 'description': "User and Group Settings", 'type': "header"},
             {'_id': "6.2.1", 'description': "Ensure accounts in /etc/passwd use shadowed passwords", 'function': CISAudit.audit_etc_passwd_accounts_use_shadowed_passwords, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.2", 'description': "Ensure /etc/shadow password fields are not empty", 'function': CISAudit.audit_etc_shadow_password_fields_are_not_empty, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.2.3", 'description': "Ensure all groups in /etc/passwd exist in /etc/group", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.2.3", 'description': "Ensure all groups in /etc/passwd exist in /etc/group", 'function': CISAudit.audit_etc_passwd_gids_exist_in_etc_group, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.4", 'description': "Ensure shadow group is empty", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.5", 'description': "Ensure no duplicate user names exist", 'function': CISAudit.audit_duplicate_user_names, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.6", 'description': "Ensure no duplicate user names exist", 'function': CISAudit.audit_duplicate_user_names, 'levels': {'server': 1, 'workstation': 1}},
