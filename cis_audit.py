@@ -1804,6 +1804,28 @@ class CISAudit:
 
         return state
 
+    def audit_system_accounts_are_secured(self) -> int:
+        ignored_users = ['root', 'sync', 'shutdown', 'halt']
+        uid_min = int(self._shellexec(R"awk '/^\s*UID_MIN/ {print $2}' /etc/login.defs").stdout[0])
+        valid_shells = ['/sbin/nologin', '/bin/false']
+        state = 0
+
+        passwd_file = self._shellexec('cat /etc/passwd').stdout
+
+        for line in passwd_file:
+            if line == '':
+                continue
+
+            user = line.split(':')[0]
+            uid = int(line.split(':')[2])
+            shell = line.split(':')[6]
+
+            if user not in ignored_users and uid < uid_min:
+                if shell not in valid_shells:
+                    state = 1
+
+        return state
+
     def audit_system_is_disabled_when_audit_logs_are_full(self) -> int:
         state = 0
 
@@ -2233,7 +2255,7 @@ benchmarks = {
             {'_id': "5.5.1.3", 'description': "Ensure password expiration warning days is 7 or more", 'function': CISAudit.audit_password_expiration_warning_is_configured, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "5.5.1.4", 'description': "Ensure inactive password lock is 30 days or less", 'function': CISAudit.audit_password_inactive_lock_is_configured, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "5.5.1.5", 'description': "Ensure all users last password change date is in the past", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "5.5.2", 'description': "Ensure system accounts are secured", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "5.5.2", 'description': "Ensure system accounts are secured", 'function': CISAudit.audit_system_accounts_are_secured, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "5.5.3", 'description': "Ensure default group for the root account is GID 0", 'function': CISAudit.audit_default_group_for_root, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "5.5.4", 'description': "Ensure default shell timeout is configured", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "5.5.5", 'description': "Ensure default user umask is configured", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
