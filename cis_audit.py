@@ -1514,6 +1514,20 @@ class CISAudit:
 
         return state
 
+    def audit_removable_partition_option_is_set(self, option: str) -> int:
+        state = 0
+        removable_mountpoints = self._shellexec("lsblk -o RM,MOUNTPOINT | awk '/1/ {print $2}'").stdout
+
+        for mountpoint in removable_mountpoints:
+            if mountpoint != "":
+                cmd = Rf'findmnt -n "{mountpoint}" | grep -Ev "\b{option}\b"'
+                r = self._shellexec(cmd)
+
+                if r.stdout[0] != "":
+                    state = 1
+
+        return state
+
     def audit_root_is_only_uid_0_account(self) -> int:
         state = 0
         cmd = R"awk -F: '($3 == 0) { print $1 }' /etc/passwd"
@@ -1960,9 +1974,9 @@ benchmarks = {
             {'_id': "1.1.16", 'description': 'Ensure separate partition exists for /var/log/audit', 'function': CISAudit.audit_partition_is_separate, 'kwargs': {'partition': '/var/log/audit'}, 'levels': {'server': 2, 'workstation': 2}},
             {'_id': "1.1.17", 'description': 'Ensure separate partition exists for /home', 'function': CISAudit.audit_partition_is_separate, 'kwargs': {'partition': '/home'}, 'levels': {'server': 2, 'workstation': 2}},
             {'_id': "1.1.18", 'description': 'Ensure nodev option set on /home partition', 'function': CISAudit.audit_partition_option_is_set, 'kwargs': {'option': 'nodev', 'partition': '/home'}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "1.1.19", 'description': "Ensure noexec option set on removable media partitions", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "1.1.20", 'description': "Ensure nodev option set on removable media partitions", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "1.1.21", 'description': "Ensure nosuid option set on removable media partitions", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "1.1.19", 'description': "Ensure noexec option set on removable media partitions", 'function': CISAudit.audit_removable_partition_option_is_set, 'kwargs': {'option': 'noexec'}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "1.1.20", 'description': "Ensure nodev option set on removable media partitions", 'function': CISAudit.audit_removable_partition_option_is_set, 'kwargs': {'option': 'nodev'}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "1.1.21", 'description': "Ensure nosuid option set on removable media partitions", 'function': CISAudit.audit_removable_partition_option_is_set, 'kwargs': {'option': 'nosuid'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "1.1.22", 'description': 'Ensure sticky bit is set on all world-writable directories', 'function': CISAudit.audit_sticky_bit_on_world_writable_dirs, 'levels': {'server': 1, 'workstation': 1}, 'type': "manual"},
             {'_id': "1.1.23", 'description': "Disable Automounting", 'function': CISAudit.audit_service_is_disabled, 'kwargs': {'service': 'autofs'}, 'levels': {'server': 1, 'workstation': 2}},
             {'_id': "1.1.24", 'description': "Disable USB Storage", 'function': CISAudit.audit_kernel_module_is_disabled, 'kwargs': {'module': 'usb-storage'}, 'levels': {'server': 1, 'workstation': 2}},
