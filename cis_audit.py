@@ -1728,6 +1728,16 @@ class CISAudit:
 
         return state
 
+    def audit_shadow_group_is_empty(self) -> int:
+        state = 0
+        cmd = R"getent group shadow | awk -F: '{print $4}'"
+        r = self._shellexec(cmd)
+
+        if r.stdout[0] != '':
+            state = 1
+
+        return state
+
     def audit_sshd_config_option(self, parameter: str, expected_value: str, comparison: str = "eq") -> int:
         state = 0
         cmd = R"/usr/sbin/sshd -T"
@@ -2292,7 +2302,7 @@ benchmarks = {
             {'_id': "6.2.1", 'description': "Ensure accounts in /etc/passwd use shadowed passwords", 'function': CISAudit.audit_etc_passwd_accounts_use_shadowed_passwords, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.2", 'description': "Ensure /etc/shadow password fields are not empty", 'function': CISAudit.audit_etc_shadow_password_fields_are_not_empty, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.3", 'description': "Ensure all groups in /etc/passwd exist in /etc/group", 'function': CISAudit.audit_etc_passwd_gids_exist_in_etc_group, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.2.4", 'description': "Ensure shadow group is empty", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.2.4", 'description': "Ensure shadow group is empty", 'function': CISAudit.audit_shadow_group_is_empty, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.5", 'description': "Ensure no duplicate user names exist", 'function': CISAudit.audit_duplicate_user_names, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.6", 'description': "Ensure no duplicate user names exist", 'function': CISAudit.audit_duplicate_user_names, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.7", 'description': "Ensure no duplicate UIDs exist", 'function': CISAudit.audit_duplicate_uids, 'levels': {'server': 1, 'workstation': 1}},
