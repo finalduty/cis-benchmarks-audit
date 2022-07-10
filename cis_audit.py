@@ -860,6 +860,17 @@ class CISAudit:
 
         return state
 
+    def audit_firewalld_default_zone_is_set(self) -> int:
+        cmd = 'firewall-cmd --get-default-zone'
+        r = self._shellexec(cmd)
+
+        if r.stdout[0] != '':
+            state = 0
+        else:
+            state = 1
+
+        return state
+
     def audit_gdm_last_user_logged_in_disabled(self) -> int:
         state = 0
 
@@ -2096,7 +2107,7 @@ benchmarks = {
             {'_id': "3.5.1.2", 'description': "Ensure iptables-services not installed with firewalld", 'function': CISAudit.audit_package_not_installed, 'kwargs': {'package': "iptables-services"}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.1.3", 'description': "Ensure nftables not installed with firewalld", 'function': CISAudit.audit_package_not_installed, 'kwargs': {'package': "nftables"}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.1.4", 'description': "Ensure firewalld service enabled and running", 'function': CISAudit.audit_service_is_enabled_and_is_active, 'kwargs': {'service': "firewalld"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "3.5.1.5", 'description': "Ensure firewalld default zone is set", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "3.5.1.5", 'description': "Ensure firewalld default zone is set", 'function': CISAudit.audit_firewalld_default_zone_is_set, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.1.6", 'description': "Ensure network interfaces are assigned to appropriate zone", 'levels': {'server': 1, 'workstation': 1}, 'type': "manual"},
             {'_id': "3.5.1.7", 'description': "Ensure firewalld drops unnecessary services and ports", 'levels': {'server': 1, 'workstation': 1}, 'type': "manual"},
             {'_id': "3.5.2", 'description': "Configure nftables", 'type': "header"},
