@@ -422,8 +422,6 @@ class CISAudit:
         gids_from_etc_passwd = self._shellexec("awk -F: '{print $4}' /etc/passwd | sort -un").stdout
         state = 0
 
-        print(gids_from_etc_group)
-        print(gids_from_etc_passwd)
         for gid in gids_from_etc_passwd:
             if gid not in gids_from_etc_group:
                 self.log.warning(f'GID {gid} exists in /etc/passwd but not in /etc/group')
@@ -971,11 +969,26 @@ class CISAudit:
         homedirs = self._shellexec(R"awk -F: '{print $6}' /etc/passwd").stdout
 
         for dir in homedirs:
-            print(dir)
             if dir != '':
                 if not os.path.isdir(dir):
                     self.log.warning(f'The homedir {dir} does not exist')
                     state = 1
+
+        return state
+
+    def audit_homedirs_ownership(self) -> int:
+        state = 0
+        cmd = R"awk -F: '($1!~/(halt|sync|shutdown|nfsnobody)/ && $7!~/^(\/usr)?\/sbin\/nologin(\/)?$/ && $7!~/(\/usr)?\/bin\/false(\/)?$/) { print $1,$3,$6 }' /etc/passwd"
+        r = self._shellexec(cmd)
+
+        for row in r.stdout:
+            if row != '':
+                user, uid, homedir = row.split(' ')
+                dir = os.stat(homedir)
+
+                if dir.st_uid != int(uid):
+                    state = 1
+                    self.log.warning(f'{user}({uid}) does not own {homedir}')
 
         return state
 
@@ -2322,7 +2335,7 @@ benchmarks = {
             {'_id': "6.2.9", 'description': "Ensure root is the only UID 0 account", 'function': CISAudit.audit_root_is_only_uid_0_account, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.10", 'description': "Ensure root PATH integrity", 'levels': {'server': 1, 'workstation': 1}, 'type': "manual"},
             {'_id': "6.2.11", 'description': "Ensure all users' home directories exist", 'function': CISAudit.audit_homedirs_exist, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.2.12", 'description': "Ensure users own their home directories", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.2.12", 'description': "Ensure users own their home directories", 'function': CISAudit.audit_homedirs_ownership, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.13", 'description': "Ensure users' home directory permissions are 750 or more restrictive", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.14", 'description': "Ensure users' dot files are not group or world writable", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.15", 'description': "Ensure no users have .forward files", 'function': None, 'levels': {'server': 1, 'workstation': 1}},

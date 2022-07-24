@@ -7,18 +7,19 @@
 ##          https://jmcgeheeiv.github.io/pyfakefs/release/modules.html#pyfakefs.fake_filesystem.FakeFilesystem.create_dir
 ##          https://jmcgeheeiv.github.io/pyfakefs/release/modules.html#pyfakefs.fake_filesystem.set_uid
 
-from pyfakefs import fake_filesystem
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 from cis_audit import CISAudit
 
+from pyfakefs import fake_filesystem
+
 
 def mock_homedirs_data(self, cmd):
     output = [
-        '/root/',
-        '/home/pytest',
+        'root 0 /root',
+        'pytest 1000 /home/pytest',
         '',
     ]
     error = ['']
@@ -34,25 +35,30 @@ test = CISAudit()
 
 
 @patch.object(CISAudit, "_shellexec", mock_homedirs_data)
-def test_audit_homedirs_exist_fail_all(fs):
-    state = test.audit_homedirs_exist()
-    assert state == 1
-
-
-@patch.object(CISAudit, "_shellexec", mock_homedirs_data)
-def test_audit_homedirs_exist_fail_one(fs):
-    fs.create_dir('/root')
-
-    state = test.audit_homedirs_exist()
-    assert state == 1
-
-
-@patch.object(CISAudit, "_shellexec", mock_homedirs_data)
-def test_audit_homedirs_exist_pass(fs):
+def test_audit_users_own_their_own_homedir_fail(fs):
+    ## Create /root and /home/pytest as root:root
+    fake_filesystem.set_uid(0)
+    fake_filesystem.set_gid(0)
     fs.create_dir('/root')
     fs.create_dir('/home/pytest')
 
-    state = test.audit_homedirs_exist()
+    state = test.audit_homedirs_ownership()
+    assert state == 1
+
+
+@patch.object(CISAudit, "_shellexec", mock_homedirs_data)
+def test_audit_users_own_their_own_homedir_pass(fs):
+    ## Create /root homedir as root:root
+    fake_filesystem.set_uid(0)
+    fake_filesystem.set_gid(0)
+    fs.create_dir('/root')
+
+    ## Create /home/pytest as pytest:pytest
+    fake_filesystem.set_uid(1000)
+    fake_filesystem.set_gid(1000)
+    fs.create_dir('/home/pytest')
+
+    state = test.audit_homedirs_ownership()
     assert state == 0
 
 
