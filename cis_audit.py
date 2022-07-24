@@ -37,7 +37,7 @@ class CISAudit:
             self.config = SimpleNamespace(includes=None, excludes=None, level=0, system_type='server', log_level='DEBUG')
 
         logging.basicConfig(
-            format='%(asctime)s [%(levelname)s]: %(message)s',
+            format='%(asctime)s [%(levelname)s]: %(funcName)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S',
         )
 
@@ -966,6 +966,19 @@ class CISAudit:
 
         return state
 
+    def audit_homedirs_exist(self) -> int:
+        state = 0
+        homedirs = self._shellexec(R"awk -F: '{print $6}' /etc/passwd").stdout
+
+        for dir in homedirs:
+            print(dir)
+            if dir != '':
+                if not os.path.isdir(dir):
+                    self.log.warning(f'The homedir {dir} does not exist')
+                    state = 1
+
+        return state
+
     def audit_iptables_default_deny_policy(self, ip_version: str) -> int:
         state = 0
 
@@ -1321,7 +1334,6 @@ class CISAudit:
         cmd = f'rpm -q {packages} | grep -v "not installed"'
         r = self._shellexec(cmd)
 
-        print(r.stdout)
         ## The length of stdout should be two because a newline is output as well.
         ## e.g. print(r.stdout) will show:
         ##      ['chrony-3.4-1.el7.x86_64', '']
@@ -2309,7 +2321,7 @@ benchmarks = {
             {'_id': "6.2.8", 'description': "Ensure no duplicate GIDs exist", 'function': CISAudit.audit_duplicate_gids, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.9", 'description': "Ensure root is the only UID 0 account", 'function': CISAudit.audit_root_is_only_uid_0_account, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.10", 'description': "Ensure root PATH integrity", 'levels': {'server': 1, 'workstation': 1}, 'type': "manual"},
-            {'_id': "6.2.11", 'description': "Ensure all users' home directories exist", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.2.11", 'description': "Ensure all users' home directories exist", 'function': CISAudit.audit_homedirs_exist, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.12", 'description': "Ensure users own their home directories", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.13", 'description': "Ensure users' home directory permissions are 750 or more restrictive", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.14", 'description': "Ensure users' dot files are not group or world writable", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
