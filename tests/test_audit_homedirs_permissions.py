@@ -11,15 +11,15 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-from cis_audit import CISAudit
-
 from pyfakefs import fake_filesystem
+
+from cis_audit import CISAudit
 
 
 def mock_homedirs_data(self, cmd):
     output = [
-        'root 0 /root',
-        'pytest 1000 /home/pytest',
+        '/root',
+        '/home/pytest',
         '',
     ]
     error = ['']
@@ -35,31 +35,39 @@ test = CISAudit()
 
 
 @patch.object(CISAudit, "_shellexec", mock_homedirs_data)
-def test_audit_homedirs_ownership_fail(fs):
-    ## Create /root and /home/pytest as root:root
-    fake_filesystem.set_uid(0)
-    fake_filesystem.set_gid(0)
-    fs.create_dir('/root')
-    fs.create_dir('/home/pytest')
+def test_audit_homedirs_permissions_pass_750(fs):
+    fs.create_dir('/root', perm_bits=0o750)
+    fs.create_dir('/home/pytest', perm_bits=0o750)
 
-    state = test.audit_homedirs_ownership()
+    state = test.audit_homedirs_permissions()
+    assert state == 0
+
+
+@patch.object(CISAudit, "_shellexec", mock_homedirs_data)
+def test_audit_homedirs_permissions_pass_700(fs):
+    fs.create_dir('/root', perm_bits=0o700)
+    fs.create_dir('/home/pytest', perm_bits=0o700)
+
+    state = test.audit_homedirs_permissions()
+    assert state == 0
+
+
+@patch.object(CISAudit, "_shellexec", mock_homedirs_data)
+def test_audit_homedirs_permissions_fail_755(fs):
+    fs.create_dir('/root', perm_bits=0o755)
+    fs.create_dir('/home/pytest', perm_bits=0o755)
+
+    state = test.audit_homedirs_permissions()
     assert state == 1
 
 
 @patch.object(CISAudit, "_shellexec", mock_homedirs_data)
-def test_audit_homedirs_ownership_pass(fs):
-    ## Create /root homedir as root:root
-    fake_filesystem.set_uid(0)
-    fake_filesystem.set_gid(0)
-    fs.create_dir('/root')
+def test_audit_homedirs_permissions_fail_770(fs):
+    fs.create_dir('/root', perm_bits=0o770)
+    fs.create_dir('/home/pytest', perm_bits=0o770)
 
-    ## Create /home/pytest as pytest:pytest
-    fake_filesystem.set_uid(1000)
-    fake_filesystem.set_gid(1000)
-    fs.create_dir('/home/pytest')
-
-    state = test.audit_homedirs_ownership()
-    assert state == 0
+    state = test.audit_homedirs_permissions()
+    assert state == 1
 
 
 if __name__ == '__main__':

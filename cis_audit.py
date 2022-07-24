@@ -745,7 +745,7 @@ class CISAudit:
 
         return state
 
-    def audit_file_permissions(self, file: str, expected_mode: str, expected_user: str = "root", expected_group: str = "root") -> int:
+    def audit_file_permissions(self, file: str, expected_mode: str, expected_user: str = None, expected_group: str = None) -> int:
         """Check that a file's ownership matches the expected_user and expected_group, and that the file's permissions match or are more restrictive than the expected_mode.
 
         Parameters
@@ -820,15 +820,17 @@ class CISAudit:
         octal_file_mode = oct(file_mode)
         binary_file_mode = str(format(int(file_mode), '012b'))
 
-        ## Set fail state if user does not match expectation
-        if file_user != expected_user:
-            state += 1
-            self.log.debug(f'Test failure: file_user "{file_user}" for {file} did not match expected_user "{expected_user}"')
+        if expected_user is not None:
+            ## Set fail state if user does not match expectation
+            if file_user != expected_user:
+                state += 1
+                self.log.debug(f'Test failure: file_user "{file_user}" for {file} did not match expected_user "{expected_user}"')
 
-        ## Set fail state if group does not match expecation
-        if file_group != expected_group:
-            state += 2
-            self.log.debug(f'Test failure: file_group "{file_group}" for {file} did not match expected_group "{expected_group}"')
+        if expected_group is not None:
+            ## Set fail state if group does not match expecation
+            if file_group != expected_group:
+                state += 2
+                self.log.debug(f'Test failure: file_group "{file_group}" for {file} did not match expected_group "{expected_group}"')
 
         ## Iterate over all bits in the binary_file_mode to ensure they're equal to, or more restrictive than, the expected_mode. Refer to the table in the description above for what the individual 'this_failure_score' values refer to.
         for i in range(len(binary_file_mode)):
@@ -989,6 +991,19 @@ class CISAudit:
                 if dir.st_uid != int(uid):
                     state = 1
                     self.log.warning(f'{user}({uid}) does not own {homedir}')
+
+        return state
+
+    def audit_homedirs_permissions(self) -> int:
+        state = 0
+        cmd = R"awk -F: '($1!~/(halt|sync|shutdown|nfsnobody)/ && $7!~/^(\/usr)?\/sbin\/nologin(\/)?$/ && $7!~/(\/usr)?\/bin\/false(\/)?$/) { print $6 }' /etc/passwd"
+        r = self._shellexec(cmd)
+
+        for dir in r.stdout:
+            if dir != '':
+                if self.audit_file_permissions(dir, '0750') != 0:
+                    state = 1
+                    self.log.warning(f'Homedir {dir} is not 0750 or more restrictive')
 
         return state
 
@@ -2310,14 +2325,14 @@ benchmarks = {
             {'_id': "6", 'description': "System Maintenance", 'type': "header"},
             {'_id': "6.1", 'description': "System File Permissions", 'type': "header"},
             {'_id': "6.1.1", 'description': "Audit system file permissions", 'levels': {'server': 2, 'workstation': 2}, 'type': "manual"},
-            {'_id': "6.1.2", 'description': "Ensure permissions on /etc/passwd are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/passwd", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.1.3", 'description': "Ensure permissions on /etc/passwd- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/passwd-", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.1.4", 'description': "Ensure permissions on /etc/shadow are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/shadow", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.1.5", 'description': "Ensure permissions on /etc/shadow- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/shadow-", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.1.6", 'description': "Ensure permissions on /etc/gshadow- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/gshadow-", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.1.7", 'description': "Ensure permissions on /etc/gshadow are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/gshadow", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.1.8", 'description': "Ensure permissions on /etc/group are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/group", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.1.9", 'description': "Ensure permissions on /etc/group- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/group-", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.2", 'description': "Ensure permissions on /etc/passwd are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/passwd", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.3", 'description': "Ensure permissions on /etc/passwd- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/passwd-", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.4", 'description': "Ensure permissions on /etc/shadow are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/shadow", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.5", 'description': "Ensure permissions on /etc/shadow- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/shadow-", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.6", 'description': "Ensure permissions on /etc/gshadow- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/gshadow-", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.7", 'description': "Ensure permissions on /etc/gshadow are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/gshadow", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.8", 'description': "Ensure permissions on /etc/group are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/group", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.9", 'description': "Ensure permissions on /etc/group- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/group-", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.1.10", 'description': "Ensure no world writable files exist", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.1.11", 'description': "Ensure no unowned files or directories exist", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.1.12", 'description': "Ensure no ungrouped files or directories exist", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
@@ -2336,7 +2351,7 @@ benchmarks = {
             {'_id': "6.2.10", 'description': "Ensure root PATH integrity", 'levels': {'server': 1, 'workstation': 1}, 'type': "manual"},
             {'_id': "6.2.11", 'description': "Ensure all users' home directories exist", 'function': CISAudit.audit_homedirs_exist, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.12", 'description': "Ensure users own their home directories", 'function': CISAudit.audit_homedirs_ownership, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.2.13", 'description': "Ensure users' home directory permissions are 750 or more restrictive", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.2.13", 'description': "Ensure users' home directory permissions are 750 or more restrictive", 'function': CISAudit.audit_homedirs_permissions, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.14", 'description': "Ensure users' dot files are not group or world writable", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.15", 'description': "Ensure no users have .forward files", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.16", 'description': "Ensure no users have .netrc files", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
