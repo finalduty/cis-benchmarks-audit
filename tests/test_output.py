@@ -1,85 +1,76 @@
 #!/usr/bin/env python3
 
+from mock import patch
 import pytest
 
 from cis_audit import CISAudit
 
-results = [
+mock_data = [
     ('1', 'section header'),
-    ('1.1', 'subsection header'),
-    ('1.1.1', 'test 1.1.1', 1, 'Pass', '1ms'),
-    ('2', 'section header'),
-    ('2.1', 'test 2.1', 1, 'Fail', '10ms'),
-    ('2.2', 'test 2.2', 2, 'Pass', '100ms'),
-    ('2.3', 'test 2.3', 1, 'Not Implemented'),
 ]
 
 
-def test_output_csv(capsys):
-    CISAudit().output(format='csv', data=results)
-
-    output, error = capsys.readouterr()
-    assert error == ''
-    assert output.split('\n')[0] == 'ID,Description,Level,Result,Duration'
-    assert output.split('\n')[1] == '1,"section header",,,'
-    assert output.split('\n')[2] == '1.1,"subsection header",,,'
-    assert output.split('\n')[3] == '1.1.1,"test 1.1.1",1,Pass,1ms'
-    assert output.split('\n')[4] == '2,"section header",,,'
-    assert output.split('\n')[5] == '2.1,"test 2.1",1,Fail,10ms'
-    assert output.split('\n')[6] == '2.2,"test 2.2",2,Pass,100ms'
-    assert output.split('\n')[7] == '2.3,"test 2.3",1,Not Implemented,'
+def mock_output_function(self, data, separator=None):
+    print(separator)
+    print(data)
 
 
-def test_output_json(capsys):
-    CISAudit().output(format='json', data=results)
-
-    output, error = capsys.readouterr()
-    assert error == ''
-    assert output == '{"1": {"description": "section header"}, "1.1": {"description": "subsection header"}, "1.1.1": {"description": "test 1.1.1", "level": 1, "result": "Pass", "duration": "1ms"}, "2": {"description": "section header"}, "2.1": {"description": "test 2.1", "level": 1, "result": "Fail", "duration": "10ms"}, "2.2": {"description": "test 2.2", "level": 2, "result": "Pass", "duration": "100ms"}, "2.3": {"description": "test 2.3", "level": 1, "result": "Not Implemented"}}\n'
+test = CISAudit()
 
 
-def test_output_text(capsys):
-    CISAudit().output(format='text', data=results)
+@patch.object(CISAudit, 'output_csv', mock_output_function)
+def test_output_calls_csv_function(capfd):
+    test.output(format='csv', data=mock_data)
+    stdout, stderr = capfd.readouterr()
 
-    output, error = capsys.readouterr()
-    assert error == ''
-    assert output.split('\n')[0] == "('1', 'section header')"
-    assert output.split('\n')[1] == "('1.1', 'subsection header')"
-    assert output.split('\n')[2] == "('1.1.1', 'test 1.1.1', 1, 'Pass', '1ms')"
-    assert output.split('\n')[3] == "('2', 'section header')"
-    assert output.split('\n')[4] == "('2.1', 'test 2.1', 1, 'Fail', '10ms')"
-    assert output.split('\n')[5] == "('2.2', 'test 2.2', 2, 'Pass', '100ms')"
-    assert output.split('\n')[6] == "('2.3', 'test 2.3', 1, 'Not Implemented')"
+    output = stdout.split('\n')
+
+    assert output[0] == ','
+    assert output[1] == str(mock_data)
 
 
-def test_output_psv(capsys):
-    CISAudit().output(format='psv', data=results)
+@patch.object(CISAudit, 'output_csv', mock_output_function)
+def test_output_calls_psv_function(capfd):
+    test.output(format='psv', data=mock_data)
+    stdout, stderr = capfd.readouterr()
 
-    output, error = capsys.readouterr()
-    assert error == ''
-    assert output.split('\n')[0] == 'ID|Description|Level|Result|Duration'
-    assert output.split('\n')[1] == '1|"section header"|||'
-    assert output.split('\n')[2] == '1.1|"subsection header"|||'
-    assert output.split('\n')[3] == '1.1.1|"test 1.1.1"|1|Pass|1ms'
-    assert output.split('\n')[4] == '2|"section header"|||'
-    assert output.split('\n')[5] == '2.1|"test 2.1"|1|Fail|10ms'
-    assert output.split('\n')[6] == '2.2|"test 2.2"|2|Pass|100ms'
-    assert output.split('\n')[7] == '2.3|"test 2.3"|1|Not Implemented|'
+    output = stdout.split('\n')
+
+    assert output[0] == '|'
+    assert output[1] == str(mock_data)
 
 
-def test_output_tsv(capsys):
-    CISAudit().output(format='tsv', data=results)
+@patch.object(CISAudit, 'output_csv', mock_output_function)
+def test_output_calls_tsv_function(capfd):
+    test.output(format='tsv', data=mock_data)
+    stdout, stderr = capfd.readouterr()
 
-    output, error = capsys.readouterr()
-    assert error == ''
-    assert output.split('\n')[0] == 'ID	Description	Level	Result	Duration'
-    assert output.split('\n')[1] == '1	"section header"			'
-    assert output.split('\n')[2] == '1.1	"subsection header"			'
-    assert output.split('\n')[3] == '1.1.1	"test 1.1.1"	1	Pass	1ms'
-    assert output.split('\n')[4] == '2	"section header"			'
-    assert output.split('\n')[5] == '2.1	"test 2.1"	1	Fail	10ms'
-    assert output.split('\n')[6] == '2.2	"test 2.2"	2	Pass	100ms'
-    assert output.split('\n')[7] == '2.3	"test 2.3"	1	Not Implemented	'
+    output = stdout.split('\n')
+
+    assert output[0] == '\t'
+    assert output[1] == str(mock_data)
+
+
+@patch.object(CISAudit, 'output_json', mock_output_function)
+def test_output_calls_json_function(capfd):
+    test.output(format='json', data=mock_data)
+    stdout, stderr = capfd.readouterr()
+
+    output = stdout.split('\n')
+
+    assert output[0] == 'None'
+    assert output[1] == str(mock_data)
+
+
+@patch.object(CISAudit, 'output_text', mock_output_function)
+def test_output_calls_text_function(capfd):
+    test.output(format='text', data=mock_data)
+    stdout, stderr = capfd.readouterr()
+
+    output = stdout.split('\n')
+
+    assert output[0] == 'None'
+    assert output[1] == str(mock_data)
 
 
 if __name__ == '__main__':

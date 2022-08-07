@@ -9,7 +9,7 @@
 # You can obtain a copy of the CIS Benchmarks from https://www.cisecurity.org/cis-benchmarks/
 # Use of the CIS Benchmarks are subject to the Terms of Use for Non-Member CIS Products - https://www.cisecurity.org/terms-of-use-for-non-member-cis-products
 
-__version__ = '0.20.0-alpha.1'
+__version__ = '0.20.0-alpha.2'
 
 ### Imports ###
 import json  # https://docs.python.org/3/library/json.html
@@ -26,6 +26,7 @@ from datetime import datetime  # https://docs.python.org/3/library/datetime.html
 from grp import getgrgid  # https://docs.python.org/3/library/grp.html#grp.getgrgid
 from pwd import getpwuid  # https://docs.python.org/3/library/pwd.html#pwd.getpwuid
 from types import SimpleNamespace  # https://docs.python.org/3/library/types.html#types.SimpleNamespace
+from typing import Generator  # https://docs.python.org/3/library/typing.html#typing.Generator
 
 
 ### Classes ###
@@ -37,12 +38,22 @@ class CISAudit:
             self.config = SimpleNamespace(includes=None, excludes=None, level=0, system_type='server', log_level='DEBUG')
 
         logging.basicConfig(
-            format='%(asctime)s [%(levelname)s]: %(message)s',
+            format='%(asctime)s [%(levelname)s]: %(funcName)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S',
         )
 
         self.log = logging.getLogger(__name__)
         self.log.setLevel(self.config.log_level)
+
+    def _get_homedirs(self) -> "Generator[str, int, str]":
+        cmd = R"awk -F: '($1!~/(halt|sync|shutdown|nfsnobody)/ && $7!~/^(\/usr)?\/sbin\/nologin(\/)?$/ && $7!~/(\/usr)?\/bin\/false(\/)?$/) { print $1,$3,$6 }' /etc/passwd"
+        r = self._shellexec(cmd)
+
+        for row in r.stdout:
+            if row != "":
+                user, uid, homedir = row.split(' ')
+
+                yield user, int(uid), homedir
 
     def _get_utcnow(self) -> datetime:
         return datetime.utcnow()
@@ -118,7 +129,7 @@ class CISAudit:
 
             ## Check if the test_id is in the included tests
             if test_id in self.config.includes:
-                self.log.info(f'Test {test_id} was explicitly included')
+                self.log.debug(f'Test {test_id} was explicitly included')
                 is_test_included = True
 
             elif is_parent_test:
@@ -143,7 +154,7 @@ class CISAudit:
                     break
 
             if test_id in self.config.excludes:
-                self.log.info(f'Test {test_id} was explicitly excluded')
+                self.log.debug(f'Test {test_id} was explicitly excluded')
                 is_test_included = False
 
             elif is_parent_excluded:
@@ -414,6 +425,18 @@ class CISAudit:
 
         if r.stdout[0] != '':
             state += 1
+
+        return state
+
+    def audit_etc_passwd_gids_exist_in_etc_group(self) -> int:
+        gids_from_etc_group = self._shellexec("awk -F: '{print $3}' /etc/group | sort -un").stdout
+        gids_from_etc_passwd = self._shellexec("awk -F: '{print $4}' /etc/passwd | sort -un").stdout
+        state = 0
+
+        for gid in gids_from_etc_passwd:
+            if gid not in gids_from_etc_group:
+                self.log.warning(f'GID {gid} exists in /etc/passwd but not in /etc/group')
+                state = 1
 
         return state
 
@@ -733,7 +756,7 @@ class CISAudit:
 
         return state
 
-    def audit_file_permissions(self, file: str, expected_mode: str, expected_user: str = "root", expected_group: str = "root") -> int:
+    def audit_file_permissions(self, file: str, expected_mode: str, expected_user: str = None, expected_group: str = None) -> int:
         """Check that a file's ownership matches the expected_user and expected_group, and that the file's permissions match or are more restrictive than the expected_mode.
 
         Parameters
@@ -808,15 +831,17 @@ class CISAudit:
         octal_file_mode = oct(file_mode)
         binary_file_mode = str(format(int(file_mode), '012b'))
 
-        ## Set fail state if user does not match expectation
-        if file_user != expected_user:
-            state += 1
-            self.log.debug(f'Test failure: file_user "{file_user}" for {file} did not match expected_user "{expected_user}"')
+        if expected_user is not None:
+            ## Set fail state if user does not match expectation
+            if file_user != expected_user:
+                state += 1
+                self.log.debug(f'Test failure: file_user "{file_user}" for {file} did not match expected_user "{expected_user}"')
 
-        ## Set fail state if group does not match expecation
-        if file_group != expected_group:
-            state += 2
-            self.log.debug(f'Test failure: file_group "{file_group}" for {file} did not match expected_group "{expected_group}"')
+        if expected_group is not None:
+            ## Set fail state if group does not match expecation
+            if file_group != expected_group:
+                state += 2
+                self.log.debug(f'Test failure: file_group "{file_group}" for {file} did not match expected_group "{expected_group}"')
 
         ## Iterate over all bits in the binary_file_mode to ensure they're equal to, or more restrictive than, the expected_mode. Refer to the table in the description above for what the individual 'this_failure_score' values refer to.
         for i in range(len(binary_file_mode)):
@@ -857,6 +882,17 @@ class CISAudit:
                 ]
             ):
                 state = 0
+
+        return state
+
+    def audit_firewalld_default_zone_is_set(self) -> int:
+        cmd = 'firewall-cmd --get-default-zone'
+        r = self._shellexec(cmd)
+
+        if r.stdout[0] != '':
+            state = 0
+        else:
+            state = 1
 
         return state
 
@@ -938,6 +974,41 @@ class CISAudit:
 
         if r.stdout[0] != '':
             state += 2
+
+        return state
+
+    def audit_homedirs_exist(self) -> int:
+        state = 0
+        # homedirs = self._shellexec(R"awk -F: '{print $6}' /etc/passwd").stdout
+
+        # for dir in homedirs:
+        for user, uid, homedir in self._get_homedirs():
+            if homedir != '':
+                if not os.path.isdir(homedir):
+                    self.log.warning(f'The homedir {homedir} does not exist')
+                    state = 1
+
+        return state
+
+    def audit_homedirs_ownership(self) -> int:
+        state = 0
+
+        for user, uid, homedir in self._get_homedirs():
+            dir = os.stat(homedir)
+
+            if dir.st_uid != int(uid):
+                state = 1
+                self.log.warning(f'{user}({uid}) does not own {homedir}')
+
+        return state
+
+    def audit_homedirs_permissions(self) -> int:
+        state = 0
+
+        for user, uid, homedir in self._get_homedirs():
+            if self.audit_file_permissions(homedir, '0750') != 0:
+                state = 1
+                self.log.warning(f'Homedir {homedir} is not 0750 or more restrictive')
 
         return state
 
@@ -1291,6 +1362,23 @@ class CISAudit:
 
         return state
 
+    def audit_only_one_package_is_installed(self, packages: str) -> int:
+        ### Similar to audit_package_is_installed but requires one of many packages is installed
+        cmd = f'rpm -q {packages} | grep -v "not installed"'
+        r = self._shellexec(cmd)
+
+        ## The length of stdout should be two because a newline is output as well.
+        ## e.g. print(r.stdout) will show:
+        ##      ['chrony-3.4-1.el7.x86_64', '']
+        ##      ['chrony-3.4-1.el7.x86_64', 'ntp-4.2.6p5-29.el7.centos.2.x86_64', '']
+
+        if len(r.stdout) == 2 and r.stdout[1] == "":
+            state = 0
+        else:
+            state = 1
+
+        return state
+
     def audit_package_is_installed(self, package: str) -> int:
         cmd = f'rpm -q {package}'
         r = self._shellexec(cmd)
@@ -1514,6 +1602,20 @@ class CISAudit:
 
         return state
 
+    def audit_removable_partition_option_is_set(self, option: str) -> int:
+        state = 0
+        removable_mountpoints = self._shellexec("lsblk -o RM,MOUNTPOINT | awk '/1/ {print $2}'").stdout
+
+        for mountpoint in removable_mountpoints:
+            if mountpoint != "":
+                cmd = Rf'findmnt -n "{mountpoint}" | grep -Ev "\b{option}\b"'
+                r = self._shellexec(cmd)
+
+                if r.stdout[0] != "":
+                    state = 1
+
+        return state
+
     def audit_root_is_only_uid_0_account(self) -> int:
         state = 0
         cmd = R"awk -F: '($3 == 0) { print $1 }' /etc/passwd"
@@ -1671,6 +1773,16 @@ class CISAudit:
 
         return state
 
+    def audit_shadow_group_is_empty(self) -> int:
+        state = 0
+        cmd = R"getent group shadow | awk -F: '{print $4}'"
+        r = self._shellexec(cmd)
+
+        if r.stdout[0] != '':
+            state = 1
+
+        return state
+
     def audit_sshd_config_option(self, parameter: str, expected_value: str, comparison: str = "eq") -> int:
         state = 0
         cmd = R"/usr/sbin/sshd -T"
@@ -1761,6 +1873,25 @@ class CISAudit:
 
         return state
 
+    def audit_system_accounts_are_secured(self) -> int:
+        ignored_users = ['root', 'sync', 'shutdown', 'halt']
+        uid_min = int(self._shellexec(R"awk '/^\s*UID_MIN/ {print $2}' /etc/login.defs").stdout[0])
+        valid_shells = ['/sbin/nologin', '/bin/false']
+        state = 0
+
+        passwd_file = self._shellexec('cat /etc/passwd').stdout
+
+        for line in passwd_file:
+            user = line.split(':')[0]
+            uid = int(line.split(':')[2])
+            shell = line.split(':')[6]
+
+            if user not in ignored_users and uid < uid_min:
+                if shell not in valid_shells:
+                    state = 1
+
+        return state
+
     def audit_system_is_disabled_when_audit_logs_are_full(self) -> int:
         state = 0
 
@@ -1811,37 +1942,105 @@ class CISAudit:
                 sep = '|'
             elif format == 'tsv':
                 sep = '\t'
-            print(f'ID{sep}Description{sep}Level{sep}Result{sep}Duration')
-            for record in data:
-                if len(record) == 2:
-                    print(f'{record[0]}{sep}"{record[1]}"{sep}{sep}{sep}')
-                elif len(record) == 4:
-                    print(f'{record[0]}{sep}"{record[1]}"{sep}{record[2]}{sep}{record[3]}{sep}')
-                elif len(record) == 5:
-                    print(f'{record[0]}{sep}"{record[1]}"{sep}{record[2]}{sep}{record[3]}{sep}{record[4]}')
+
+            self.output_csv(data, separator=sep)
 
         elif format == 'json':
-            output = {}
-
-            for record in data:
-                id = record[0]
-                output[id] = {}
-                output[id]['description'] = record[1]
-
-                if len(record) >= 3:
-                    output[id]['level'] = record[2]
-
-                if len(record) >= 4:
-                    output[id]['result'] = record[3]
-
-                if len(record) >= 5:
-                    output[id]['duration'] = record[4]
-
-            print(json.dumps(output))
+            self.output_json(data)
 
         elif format == 'text':
-            for record in data:
-                print(record)
+            self.output_text(data)
+
+    def output_csv(self, data: list, separator: str):
+        ## Shorten the variable name so that it's easier to construct the print's below
+        sep = separator
+
+        ## Print Header
+        print(f'ID{sep}Description{sep}Level{sep}Result{sep}Duration')
+
+        ## Print Data
+        for record in data:
+            if len(record) == 2:
+                print(f'{record[0]}{sep}"{record[1]}"{sep}{sep}{sep}')
+            elif len(record) == 4:
+                print(f'{record[0]}{sep}"{record[1]}"{sep}{record[2]}{sep}{record[3]}{sep}')
+            elif len(record) == 5:
+                print(f'{record[0]}{sep}"{record[1]}"{sep}{record[2]}{sep}{record[3]}{sep}{record[4]}')
+
+    def output_json(self, data):
+        output = {}
+
+        for record in data:
+            id = record[0]
+            output[id] = {}
+            output[id]['description'] = record[1]
+
+            if len(record) >= 3:
+                output[id]['level'] = record[2]
+
+            if len(record) >= 4:
+                output[id]['result'] = record[3]
+
+            if len(record) >= 5:
+                output[id]['duration'] = record[4]
+
+        print(json.dumps(output))
+
+    def output_text(self, data):
+        ## Set starting/minimum width of columns to fit the column headers
+        width_id = len("ID")
+        width_description = len("Description")
+        width_level = len("Level")
+        width_result = len("Result")
+        width_duration = len("Duration")
+
+        ## Find the max width of each column
+        for row in data:
+            row_length = len(row)
+
+            ## In the following section, len_level and len_duration are commented out because the
+            ## headers are wider than the data in the rows, so they currently don't need expanding
+            ## If I leave them uncommented, then codecov complains about the tests not covering them.
+
+            len_id = len(str(row[0])) if row_length >= 1 else None
+            len_description = len(str(row[1])) if row_length >= 2 else None
+            # len_level = len(str(row[2])) if row_length >= 3 else None
+            len_result = len(str(row[3])) if row_length >= 4 else None
+            # len_duration = len(str(row[4])) if row_length >= 5 else None
+
+            if len_id and len_id > width_id:
+                width_id = len_id
+                # print(f'Width for ID expanded to {width_id}')
+
+            if len_description and len_description > width_description:
+                width_description = len_description
+
+            # if len_level and len_level > width_level:
+            #    width_level = len_level
+
+            if len_result and len_result > width_result:
+                width_result = len_result
+
+            # if len_duration and len_duration > width_duration:
+            #    width_duration = len_duration
+
+        ## Print column headers
+        print(f'{"ID" : <{width_id}}  {"Description" : <{width_description}}  {"Level" : ^{width_level}}  {"Result" : ^{width_result}}  {"Duration" : >{width_duration}}')
+        print(f'{"--" :-<{width_id}}  {"-----------" :-<{width_description}}  {"-----" :-^{width_level}}  {"------" :-^{width_result}}  {"--------" :->{width_duration}}')
+
+        ## Print Data
+        for row in data:
+            id = row[0] if len(row) >= 1 else ""
+            description = row[1] if len(row) >= 2 else ""
+            level = row[2] if len(row) >= 3 else ""
+            result = row[3] if len(row) >= 4 else ""
+            duration = row[4] if len(row) >= 5 else ""
+
+            ## Print blank row before new major sections
+            if len(id) == 1:
+                print()
+
+            print(f'{id: <{width_id}}  {description: <{width_description}}  {level: ^{width_level}}  {result: ^{width_result}}  {duration: >{width_duration}}')
 
     def run_tests(self, tests: "list[dict]") -> dict:
         results = []
@@ -1960,9 +2159,9 @@ benchmarks = {
             {'_id': "1.1.16", 'description': 'Ensure separate partition exists for /var/log/audit', 'function': CISAudit.audit_partition_is_separate, 'kwargs': {'partition': '/var/log/audit'}, 'levels': {'server': 2, 'workstation': 2}},
             {'_id': "1.1.17", 'description': 'Ensure separate partition exists for /home', 'function': CISAudit.audit_partition_is_separate, 'kwargs': {'partition': '/home'}, 'levels': {'server': 2, 'workstation': 2}},
             {'_id': "1.1.18", 'description': 'Ensure nodev option set on /home partition', 'function': CISAudit.audit_partition_option_is_set, 'kwargs': {'option': 'nodev', 'partition': '/home'}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "1.1.19", 'description': "Ensure noexec option set on removable media partitions", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "1.1.20", 'description': "Ensure nodev option set on removable media partitions", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "1.1.21", 'description': "Ensure nosuid option set on removable media partitions", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "1.1.19", 'description': "Ensure noexec option set on removable media partitions", 'function': CISAudit.audit_removable_partition_option_is_set, 'kwargs': {'option': 'noexec'}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "1.1.20", 'description': "Ensure nodev option set on removable media partitions", 'function': CISAudit.audit_removable_partition_option_is_set, 'kwargs': {'option': 'nodev'}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "1.1.21", 'description': "Ensure nosuid option set on removable media partitions", 'function': CISAudit.audit_removable_partition_option_is_set, 'kwargs': {'option': 'nosuid'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "1.1.22", 'description': 'Ensure sticky bit is set on all world-writable directories', 'function': CISAudit.audit_sticky_bit_on_world_writable_dirs, 'levels': {'server': 1, 'workstation': 1}, 'type': "manual"},
             {'_id': "1.1.23", 'description': "Disable Automounting", 'function': CISAudit.audit_service_is_disabled, 'kwargs': {'service': 'autofs'}, 'levels': {'server': 1, 'workstation': 2}},
             {'_id': "1.1.24", 'description': "Disable USB Storage", 'function': CISAudit.audit_kernel_module_is_disabled, 'kwargs': {'module': 'usb-storage'}, 'levels': {'server': 1, 'workstation': 2}},
@@ -2010,7 +2209,7 @@ benchmarks = {
             {'_id': "2.1.1", 'description': "Ensure xinetd is not installed", 'function': CISAudit.audit_package_not_installed, 'kwargs': {'package': 'xinetd'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.2", 'description': "Special Purpose Services", 'type': "header"},
             {'_id': "2.2.1", 'description': "Time Synchronization", 'type': "header"},
-            {'_id': "2.2.1.1", 'description': "Ensure time synchronisation is in use", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "2.2.1.1", 'description': "Ensure time synchronisation is in use", 'function': CISAudit.audit_only_one_package_is_installed, 'kwargs': {'packages': "chrony ntp"}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.2.1.2", 'description': "Ensure chrony is configured", 'function': CISAudit.audit_chrony_is_configured, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.2.1.3", 'description': "Ensure ntp is configured", 'function': CISAudit.audit_ntp_is_configured, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.2.2", 'description': 'Ensure X11 Server components are not installed', 'function': CISAudit.audit_package_not_installed, 'kwargs': {'package': 'xorg-x11-server*'}, 'levels': {'server': 1, 'workstation': None}},
@@ -2029,8 +2228,8 @@ benchmarks = {
             {'_id': "2.2.15", 'description': 'Ensure telnet-server is not installed', 'function': CISAudit.audit_package_not_installed, 'kwargs': {'package': 'telnet-server'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.2.16", 'description': 'Ensure mail transfer agent is configured for local-only mode', 'function': CISAudit.audit_mta_is_localhost_only, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.2.17", 'description': 'Ensure nfs-utils is not installed or the nfs-server service is masked', 'function': CISAudit.audit_package_not_installed_or_service_is_masked, 'kwargs': {'package': "nfsutils", 'service': "nfs-server"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "2.2.18", 'description': "Ensure rpcbind is not installed or the rpcbind service is masked", 'function': CISAudit.audit_package_not_installed_or_service_is_masked, 'kwargs': {'package': "rpcbind", 'service': "rpcbind"}},
-            {'_id': "2.2.19", 'description': "Ensure rsync is not installed or the rsyncd service is masked", 'function': CISAudit.audit_package_not_installed_or_service_is_masked, 'kwargs': {'package': "rsync", 'service': "rsyncd"}},
+            {'_id': "2.2.18", 'description': "Ensure rpcbind is not installed or the rpcbind service is masked", 'function': CISAudit.audit_package_not_installed_or_service_is_masked, 'kwargs': {'package': "rpcbind", 'service': "rpcbind"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "2.2.19", 'description': "Ensure rsync is not installed or the rsyncd service is masked", 'function': CISAudit.audit_package_not_installed_or_service_is_masked, 'kwargs': {'package': "rsync", 'service': "rsyncd"}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.3", 'description': "Service Clients", 'type': "header"},
             {'_id': "2.3.1", 'description': "Ensure NIS client is not installed", 'function': CISAudit.audit_package_not_installed, 'kwargs': {'package': 'ypcbind'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.3.2", 'description': "Ensure rsh client is not installed", 'function': CISAudit.audit_package_not_installed, 'kwargs': {'package': 'rsh'}, 'levels': {'server': 1, 'workstation': 1}},
@@ -2064,7 +2263,7 @@ benchmarks = {
             {'_id': "3.5.1.2", 'description': "Ensure iptables-services not installed with firewalld", 'function': CISAudit.audit_package_not_installed, 'kwargs': {'package': "iptables-services"}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.1.3", 'description': "Ensure nftables not installed with firewalld", 'function': CISAudit.audit_package_not_installed, 'kwargs': {'package': "nftables"}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.1.4", 'description': "Ensure firewalld service enabled and running", 'function': CISAudit.audit_service_is_enabled_and_is_active, 'kwargs': {'service': "firewalld"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "3.5.1.5", 'description': "Ensure firewalld default zone is set", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "3.5.1.5", 'description': "Ensure firewalld default zone is set", 'function': CISAudit.audit_firewalld_default_zone_is_set, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.1.6", 'description': "Ensure network interfaces are assigned to appropriate zone", 'levels': {'server': 1, 'workstation': 1}, 'type': "manual"},
             {'_id': "3.5.1.7", 'description': "Ensure firewalld drops unnecessary services and ports", 'levels': {'server': 1, 'workstation': 1}, 'type': "manual"},
             {'_id': "3.5.2", 'description': "Configure nftables", 'type': "header"},
@@ -2190,7 +2389,7 @@ benchmarks = {
             {'_id': "5.5.1.3", 'description': "Ensure password expiration warning days is 7 or more", 'function': CISAudit.audit_password_expiration_warning_is_configured, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "5.5.1.4", 'description': "Ensure inactive password lock is 30 days or less", 'function': CISAudit.audit_password_inactive_lock_is_configured, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "5.5.1.5", 'description': "Ensure all users last password change date is in the past", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "5.5.2", 'description': "Ensure system accounts are secured", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "5.5.2", 'description': "Ensure system accounts are secured", 'function': CISAudit.audit_system_accounts_are_secured, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "5.5.3", 'description': "Ensure default group for the root account is GID 0", 'function': CISAudit.audit_default_group_for_root, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "5.5.4", 'description': "Ensure default shell timeout is configured", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "5.5.5", 'description': "Ensure default user umask is configured", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
@@ -2199,14 +2398,14 @@ benchmarks = {
             {'_id': "6", 'description': "System Maintenance", 'type': "header"},
             {'_id': "6.1", 'description': "System File Permissions", 'type': "header"},
             {'_id': "6.1.1", 'description': "Audit system file permissions", 'levels': {'server': 2, 'workstation': 2}, 'type': "manual"},
-            {'_id': "6.1.2", 'description': "Ensure permissions on /etc/passwd are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/passwd", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.1.3", 'description': "Ensure permissions on /etc/passwd- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/passwd-", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.1.4", 'description': "Ensure permissions on /etc/shadow are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/shadow", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.1.5", 'description': "Ensure permissions on /etc/shadow- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/shadow-", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.1.6", 'description': "Ensure permissions on /etc/gshadow- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/gshadow-", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.1.7", 'description': "Ensure permissions on /etc/gshadow are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/gshadow", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.1.8", 'description': "Ensure permissions on /etc/group are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/group", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.1.9", 'description': "Ensure permissions on /etc/group- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/group-", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.2", 'description': "Ensure permissions on /etc/passwd are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/passwd", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.3", 'description': "Ensure permissions on /etc/passwd- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/passwd-", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.4", 'description': "Ensure permissions on /etc/shadow are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/shadow", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.5", 'description': "Ensure permissions on /etc/shadow- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/shadow-", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.6", 'description': "Ensure permissions on /etc/gshadow- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/gshadow-", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.7", 'description': "Ensure permissions on /etc/gshadow are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/gshadow", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0000"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.8", 'description': "Ensure permissions on /etc/group are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/group", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.1.9", 'description': "Ensure permissions on /etc/group- are configured", 'function': CISAudit.audit_file_permissions, 'kwargs': {'file': "/etc/group-", 'expected_user': "root", 'expected_group': "root", 'expected_mode': "0644"}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.1.10", 'description': "Ensure no world writable files exist", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.1.11", 'description': "Ensure no unowned files or directories exist", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.1.12", 'description': "Ensure no ungrouped files or directories exist", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
@@ -2215,17 +2414,17 @@ benchmarks = {
             {'_id': "6.2", 'description': "User and Group Settings", 'type': "header"},
             {'_id': "6.2.1", 'description': "Ensure accounts in /etc/passwd use shadowed passwords", 'function': CISAudit.audit_etc_passwd_accounts_use_shadowed_passwords, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.2", 'description': "Ensure /etc/shadow password fields are not empty", 'function': CISAudit.audit_etc_shadow_password_fields_are_not_empty, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.2.3", 'description': "Ensure all groups in /etc/passwd exist in /etc/group", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.2.4", 'description': "Ensure shadow group is empty", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.2.3", 'description': "Ensure all groups in /etc/passwd exist in /etc/group", 'function': CISAudit.audit_etc_passwd_gids_exist_in_etc_group, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.2.4", 'description': "Ensure shadow group is empty", 'function': CISAudit.audit_shadow_group_is_empty, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.5", 'description': "Ensure no duplicate user names exist", 'function': CISAudit.audit_duplicate_user_names, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.6", 'description': "Ensure no duplicate user names exist", 'function': CISAudit.audit_duplicate_user_names, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.7", 'description': "Ensure no duplicate UIDs exist", 'function': CISAudit.audit_duplicate_uids, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.8", 'description': "Ensure no duplicate GIDs exist", 'function': CISAudit.audit_duplicate_gids, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.9", 'description': "Ensure root is the only UID 0 account", 'function': CISAudit.audit_root_is_only_uid_0_account, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.10", 'description': "Ensure root PATH integrity", 'levels': {'server': 1, 'workstation': 1}, 'type': "manual"},
-            {'_id': "6.2.11", 'description': "Ensure all users' home directories exist", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.2.12", 'description': "Ensure users own their home directories", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.2.13", 'description': "Ensure users' home directory permissions are 750 or more restrictive", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.2.11", 'description': "Ensure all users' home directories exist", 'function': CISAudit.audit_homedirs_exist, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.2.12", 'description': "Ensure users own their home directories", 'function': CISAudit.audit_homedirs_ownership, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.2.13", 'description': "Ensure users' home directory permissions are 750 or more restrictive", 'function': CISAudit.audit_homedirs_permissions, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.14", 'description': "Ensure users' dot files are not group or world writable", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.15", 'description': "Ensure no users have .forward files", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.16", 'description': "Ensure no users have .netrc files", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
