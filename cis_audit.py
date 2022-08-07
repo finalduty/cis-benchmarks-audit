@@ -9,7 +9,7 @@
 # You can obtain a copy of the CIS Benchmarks from https://www.cisecurity.org/cis-benchmarks/
 # Use of the CIS Benchmarks are subject to the Terms of Use for Non-Member CIS Products - https://www.cisecurity.org/terms-of-use-for-non-member-cis-products
 
-__version__ = '0.20.0'
+__version__ = '0.20.0-alpha.2'
 
 ### Imports ###
 import json  # https://docs.python.org/3/library/json.html
@@ -1942,37 +1942,101 @@ class CISAudit:
                 sep = '|'
             elif format == 'tsv':
                 sep = '\t'
-            print(f'ID{sep}Description{sep}Level{sep}Result{sep}Duration')
-            for record in data:
-                if len(record) == 2:
-                    print(f'{record[0]}{sep}"{record[1]}"{sep}{sep}{sep}')
-                elif len(record) == 4:
-                    print(f'{record[0]}{sep}"{record[1]}"{sep}{record[2]}{sep}{record[3]}{sep}')
-                elif len(record) == 5:
-                    print(f'{record[0]}{sep}"{record[1]}"{sep}{record[2]}{sep}{record[3]}{sep}{record[4]}')
+
+            self.output_csv(data, separator=sep)
 
         elif format == 'json':
-            output = {}
-
-            for record in data:
-                id = record[0]
-                output[id] = {}
-                output[id]['description'] = record[1]
-
-                if len(record) >= 3:
-                    output[id]['level'] = record[2]
-
-                if len(record) >= 4:
-                    output[id]['result'] = record[3]
-
-                if len(record) >= 5:
-                    output[id]['duration'] = record[4]
-
-            print(json.dumps(output))
+            self.output_json(data)
 
         elif format == 'text':
-            for record in data:
-                print(record)
+            self.output_text(data)
+
+    def output_csv(self, data: list, separator: str):
+        ## Shorten the variable name so that it's easier to construct the print's below
+        sep = separator
+
+        ## Print Header
+        print(f'ID{sep}Description{sep}Level{sep}Result{sep}Duration')
+
+        ## Print Data
+        for record in data:
+            if len(record) == 2:
+                print(f'{record[0]}{sep}"{record[1]}"{sep}{sep}{sep}')
+            elif len(record) == 4:
+                print(f'{record[0]}{sep}"{record[1]}"{sep}{record[2]}{sep}{record[3]}{sep}')
+            elif len(record) == 5:
+                print(f'{record[0]}{sep}"{record[1]}"{sep}{record[2]}{sep}{record[3]}{sep}{record[4]}')
+
+    def output_json(self, data):
+        output = {}
+
+        for record in data:
+            id = record[0]
+            output[id] = {}
+            output[id]['description'] = record[1]
+
+            if len(record) >= 3:
+                output[id]['level'] = record[2]
+
+            if len(record) >= 4:
+                output[id]['result'] = record[3]
+
+            if len(record) >= 5:
+                output[id]['duration'] = record[4]
+
+        print(json.dumps(output))
+
+    def output_text(self, data):
+        ## Set starting/minimum width of columns to fit the column headers
+        width_id = len("ID")
+        width_description = len("Description")
+        width_level = len("Level")
+        width_result = len("Result")
+        width_duration = len("Duration")
+
+        ## Find the max width of each column
+        for row in data:
+            row_length = len(row)
+
+            len_id = len(str(row[0])) if row_length >= 1 else None
+            len_description = len(str(row[1])) if row_length >= 2 else None
+            len_level = len(str(row[2])) if row_length >= 3 else None
+            len_result = len(str(row[3])) if row_length >= 4 else None
+            len_duration = len(str(row[4])) if row_length >= 5 else None
+
+            if len_id and len_id > width_id:
+                width_id = len_id
+                # print(f'Width for ID expanded to {width_id}')
+
+            if len_description and len_description > width_description:
+                width_description = len_description
+
+            if len_level and len_level > width_level:
+                width_level = len_level
+
+            if len_result and len_result > width_result:
+                width_result = len_result
+
+            if len_duration and len_duration > width_duration:
+                width_duration = len_duration
+
+        ## Print column headers
+        print(f'{"ID" : <{width_id}}  {"Description" : <{width_description}}  {"Level" : ^{width_level}}  {"Result" : ^{width_result}}  {"Duration" : >{width_duration}}')
+        print(f'{"--" :-<{width_id}}  {"-----------" :-<{width_description}}  {"-----" :-^{width_level}}  {"------" :-^{width_result}}  {"--------" :->{width_duration}}')
+
+        ## Print Data
+        for row in data:
+            id = row[0] if len(row) >= 1 else ""
+            description = row[1] if len(row) >= 2 else ""
+            level = row[2] if len(row) >= 3 else ""
+            result = row[3] if len(row) >= 4 else ""
+            duration = row[4] if len(row) >= 5 else ""
+
+            ## Print blank row before new major sections
+            if len(id) == 1:
+                print()
+
+            print(f'{id: <{width_id}}  {description: <{width_description}}  {level: ^{width_level}}  {result: ^{width_result}}  {duration: >{width_duration}}')
 
     def run_tests(self, tests: "list[dict]") -> dict:
         results = []
@@ -2028,7 +2092,7 @@ class CISAudit:
                     results.append((test_id, test_description, test_level, 'Skipped'))
 
                 elif test_type == 'notimplemented':
-                    results.append((test_id, test_description, test_level, 'Not Implemented'))
+                    results.append((test_id, test_description, test_level, 'Unimplemented'))
 
                 elif test_type == 'test':
                     start_time = self._get_utcnow()
@@ -2160,8 +2224,8 @@ benchmarks = {
             {'_id': "2.2.15", 'description': 'Ensure telnet-server is not installed', 'function': CISAudit.audit_package_not_installed, 'kwargs': {'package': 'telnet-server'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.2.16", 'description': 'Ensure mail transfer agent is configured for local-only mode', 'function': CISAudit.audit_mta_is_localhost_only, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.2.17", 'description': 'Ensure nfs-utils is not installed or the nfs-server service is masked', 'function': CISAudit.audit_package_not_installed_or_service_is_masked, 'kwargs': {'package': "nfsutils", 'service': "nfs-server"}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "2.2.18", 'description': "Ensure rpcbind is not installed or the rpcbind service is masked", 'function': CISAudit.audit_package_not_installed_or_service_is_masked, 'kwargs': {'package': "rpcbind", 'service': "rpcbind"}},
-            {'_id': "2.2.19", 'description': "Ensure rsync is not installed or the rsyncd service is masked", 'function': CISAudit.audit_package_not_installed_or_service_is_masked, 'kwargs': {'package': "rsync", 'service': "rsyncd"}},
+            {'_id': "2.2.18", 'description': "Ensure rpcbind is not installed or the rpcbind service is masked", 'function': CISAudit.audit_package_not_installed_or_service_is_masked, 'kwargs': {'package': "rpcbind", 'service': "rpcbind"}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "2.2.19", 'description': "Ensure rsync is not installed or the rsyncd service is masked", 'function': CISAudit.audit_package_not_installed_or_service_is_masked, 'kwargs': {'package': "rsync", 'service': "rsyncd"}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.3", 'description': "Service Clients", 'type': "header"},
             {'_id': "2.3.1", 'description': "Ensure NIS client is not installed", 'function': CISAudit.audit_package_not_installed, 'kwargs': {'package': 'ypcbind'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "2.3.2", 'description': "Ensure rsh client is not installed", 'function': CISAudit.audit_package_not_installed, 'kwargs': {'package': 'rsh'}, 'levels': {'server': 1, 'workstation': 1}},
