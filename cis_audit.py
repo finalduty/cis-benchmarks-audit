@@ -2092,7 +2092,7 @@ class CISAudit:
                     results.append((test_id, test_description, test_level, 'Skipped'))
 
                 elif test_type == 'notimplemented':
-                    results.append((test_id, test_description, test_level, 'Unimplemented'))
+                    results.append((test_id, test_description, test_level, 'Not Implemented'))
 
                 elif test_type == 'test':
                     start_time = self._get_utcnow()
