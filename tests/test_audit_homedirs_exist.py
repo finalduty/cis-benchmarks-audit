@@ -8,23 +8,22 @@
 ##          https://jmcgeheeiv.github.io/pyfakefs/release/modules.html#pyfakefs.fake_filesystem.set_uid
 
 from pyfakefs import fake_filesystem
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 from cis_audit import CISAudit
 
 
-def mock_homedirs_data(self, cmd):
-    output = [
-        '/root/',
-        '/home/pytest',
-        '',
+def mock_homedirs_data(self):
+    data = [
+        'root 0 /root',
+        'pytest 1000 /home/pytest',
     ]
-    error = ['']
-    returncode = 0
 
-    return SimpleNamespace(stdout=output, stderr=error, returncode=returncode)
+    for row in data:
+        user, uid, homedir = row.split(' ')
+
+        yield user, int(uid), homedir
 
 
 ## I know that pyfakefs automatically creates the 'fs' fixture for pytest for us, however stating it
@@ -33,13 +32,13 @@ fs = fake_filesystem.FakeFilesystem()
 test = CISAudit()
 
 
-@patch.object(CISAudit, "_shellexec", mock_homedirs_data)
+@patch.object(CISAudit, "_get_homedirs", mock_homedirs_data)
 def test_audit_homedirs_exist_fail_all(fs):
     state = test.audit_homedirs_exist()
     assert state == 1
 
 
-@patch.object(CISAudit, "_shellexec", mock_homedirs_data)
+@patch.object(CISAudit, "_get_homedirs", mock_homedirs_data)
 def test_audit_homedirs_exist_fail_one(fs):
     fs.create_dir('/root')
 
@@ -47,7 +46,7 @@ def test_audit_homedirs_exist_fail_one(fs):
     assert state == 1
 
 
-@patch.object(CISAudit, "_shellexec", mock_homedirs_data)
+@patch.object(CISAudit, "_get_homedirs", mock_homedirs_data)
 def test_audit_homedirs_exist_pass(fs):
     fs.create_dir('/root')
     fs.create_dir('/home/pytest')

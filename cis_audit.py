@@ -9,7 +9,7 @@
 # You can obtain a copy of the CIS Benchmarks from https://www.cisecurity.org/cis-benchmarks/
 # Use of the CIS Benchmarks are subject to the Terms of Use for Non-Member CIS Products - https://www.cisecurity.org/terms-of-use-for-non-member-cis-products
 
-__version__ = '0.20.0-alpha.1'
+__version__ = '0.20.0'
 
 ### Imports ###
 import json  # https://docs.python.org/3/library/json.html
@@ -26,6 +26,7 @@ from datetime import datetime  # https://docs.python.org/3/library/datetime.html
 from grp import getgrgid  # https://docs.python.org/3/library/grp.html#grp.getgrgid
 from pwd import getpwuid  # https://docs.python.org/3/library/pwd.html#pwd.getpwuid
 from types import SimpleNamespace  # https://docs.python.org/3/library/types.html#types.SimpleNamespace
+from typing import Generator  # https://docs.python.org/3/library/typing.html#typing.Generator
 
 
 ### Classes ###
@@ -43,6 +44,16 @@ class CISAudit:
 
         self.log = logging.getLogger(__name__)
         self.log.setLevel(self.config.log_level)
+
+    def _get_homedirs(self) -> "Generator[str, int, str]":
+        cmd = R"awk -F: '($1!~/(halt|sync|shutdown|nfsnobody)/ && $7!~/^(\/usr)?\/sbin\/nologin(\/)?$/ && $7!~/(\/usr)?\/bin\/false(\/)?$/) { print $1,$3,$6 }' /etc/passwd"
+        r = self._shellexec(cmd)
+
+        for row in r.stdout:
+            if row != "":
+                user, uid, homedir = row.split(' ')
+
+                yield user, int(uid), homedir
 
     def _get_utcnow(self) -> datetime:
         return datetime.utcnow()
@@ -118,7 +129,7 @@ class CISAudit:
 
             ## Check if the test_id is in the included tests
             if test_id in self.config.includes:
-                self.log.info(f'Test {test_id} was explicitly included')
+                self.log.debug(f'Test {test_id} was explicitly included')
                 is_test_included = True
 
             elif is_parent_test:
@@ -143,7 +154,7 @@ class CISAudit:
                     break
 
             if test_id in self.config.excludes:
-                self.log.info(f'Test {test_id} was explicitly excluded')
+                self.log.debug(f'Test {test_id} was explicitly excluded')
                 is_test_included = False
 
             elif is_parent_excluded:
@@ -968,42 +979,36 @@ class CISAudit:
 
     def audit_homedirs_exist(self) -> int:
         state = 0
-        homedirs = self._shellexec(R"awk -F: '{print $6}' /etc/passwd").stdout
+        # homedirs = self._shellexec(R"awk -F: '{print $6}' /etc/passwd").stdout
 
-        for dir in homedirs:
-            if dir != '':
-                if not os.path.isdir(dir):
-                    self.log.warning(f'The homedir {dir} does not exist')
+        # for dir in homedirs:
+        for user, uid, homedir in self._get_homedirs():
+            if homedir != '':
+                if not os.path.isdir(homedir):
+                    self.log.warning(f'The homedir {homedir} does not exist')
                     state = 1
 
         return state
 
     def audit_homedirs_ownership(self) -> int:
         state = 0
-        cmd = R"awk -F: '($1!~/(halt|sync|shutdown|nfsnobody)/ && $7!~/^(\/usr)?\/sbin\/nologin(\/)?$/ && $7!~/(\/usr)?\/bin\/false(\/)?$/) { print $1,$3,$6 }' /etc/passwd"
-        r = self._shellexec(cmd)
 
-        for row in r.stdout:
-            if row != '':
-                user, uid, homedir = row.split(' ')
-                dir = os.stat(homedir)
+        for user, uid, homedir in self._get_homedirs():
+            dir = os.stat(homedir)
 
-                if dir.st_uid != int(uid):
-                    state = 1
-                    self.log.warning(f'{user}({uid}) does not own {homedir}')
+            if dir.st_uid != int(uid):
+                state = 1
+                self.log.warning(f'{user}({uid}) does not own {homedir}')
 
         return state
 
     def audit_homedirs_permissions(self) -> int:
         state = 0
-        cmd = R"awk -F: '($1!~/(halt|sync|shutdown|nfsnobody)/ && $7!~/^(\/usr)?\/sbin\/nologin(\/)?$/ && $7!~/(\/usr)?\/bin\/false(\/)?$/) { print $6 }' /etc/passwd"
-        r = self._shellexec(cmd)
 
-        for dir in r.stdout:
-            if dir != '':
-                if self.audit_file_permissions(dir, '0750') != 0:
-                    state = 1
-                    self.log.warning(f'Homedir {dir} is not 0750 or more restrictive')
+        for user, uid, homedir in self._get_homedirs():
+            if self.audit_file_permissions(homedir, '0750') != 0:
+                state = 1
+                self.log.warning(f'Homedir {homedir} is not 0750 or more restrictive')
 
         return state
 

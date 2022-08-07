@@ -63,4 +63,4 @@ def test_audit_homedirs_ownership_pass(fs):
 
 
 if __name__ == '__main__':
-    pytest.main([__file__, '--no-cov', '-W', 'ignore:Module already imported:pytest.PytestWarning'])
+    pytest.main([__file__, '-v', '--no-cov', '-W', 'ignore:Module already imported:pytest.PytestWarning'])

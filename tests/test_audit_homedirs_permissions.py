@@ -7,7 +7,6 @@
 ##          https://jmcgeheeiv.github.io/pyfakefs/release/modules.html#pyfakefs.fake_filesystem.FakeFilesystem.create_dir
 ##          https://jmcgeheeiv.github.io/pyfakefs/release/modules.html#pyfakefs.fake_filesystem.set_uid
 
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -16,16 +15,16 @@ from pyfakefs import fake_filesystem
 from cis_audit import CISAudit
 
 
-def mock_homedirs_data(self, cmd):
-    output = [
-        '/root',
-        '/home/pytest',
-        '',
+def mock_homedirs_data(self):
+    data = [
+        'root 0 /root',
+        'pytest 1000 /home/pytest',
     ]
-    error = ['']
-    returncode = 0
 
-    return SimpleNamespace(stdout=output, stderr=error, returncode=returncode)
+    for row in data:
+        user, uid, homedir = row.split(' ')
+
+        yield user, int(uid), homedir
 
 
 ## I know that pyfakefs automatically creates the 'fs' fixture for pytest for us, however stating it
@@ -34,7 +33,7 @@ fs = fake_filesystem.FakeFilesystem()
 test = CISAudit()
 
 
-@patch.object(CISAudit, "_shellexec", mock_homedirs_data)
+@patch.object(CISAudit, "_get_homedirs", mock_homedirs_data)
 def test_audit_homedirs_permissions_pass_750(fs):
     fs.create_dir('/root', perm_bits=0o750)
     fs.create_dir('/home/pytest', perm_bits=0o750)
@@ -43,7 +42,7 @@ def test_audit_homedirs_permissions_pass_750(fs):
     assert state == 0
 
 
-@patch.object(CISAudit, "_shellexec", mock_homedirs_data)
+@patch.object(CISAudit, "_get_homedirs", mock_homedirs_data)
 def test_audit_homedirs_permissions_pass_700(fs):
     fs.create_dir('/root', perm_bits=0o700)
     fs.create_dir('/home/pytest', perm_bits=0o700)
@@ -52,7 +51,7 @@ def test_audit_homedirs_permissions_pass_700(fs):
     assert state == 0
 
 
-@patch.object(CISAudit, "_shellexec", mock_homedirs_data)
+@patch.object(CISAudit, "_get_homedirs", mock_homedirs_data)
 def test_audit_homedirs_permissions_fail_755(fs):
     fs.create_dir('/root', perm_bits=0o755)
     fs.create_dir('/home/pytest', perm_bits=0o755)
@@ -61,7 +60,7 @@ def test_audit_homedirs_permissions_fail_755(fs):
     assert state == 1
 
 
-@patch.object(CISAudit, "_shellexec", mock_homedirs_data)
+@patch.object(CISAudit, "_get_homedirs", mock_homedirs_data)
 def test_audit_homedirs_permissions_fail_770(fs):
     fs.create_dir('/root', perm_bits=0o770)
     fs.create_dir('/home/pytest', perm_bits=0o770)
