@@ -1999,7 +1999,7 @@ class CISAudit:
             row_length = len(row)
 
             ## In the following section, len_level and len_duration are commented out because the
-            ## headers are wider than the data in the rows, so they currently don't need expanding
+            ## headers are wider than the data in the rows, so they currently don't need expanding.
             ## If I leave them uncommented, then codecov complains about the tests not covering them.
 
             len_id = len(str(row[0])) if row_length >= 1 else None

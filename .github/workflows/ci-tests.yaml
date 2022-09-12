@@ -1,12 +1,12 @@
 # This workflow will install Python dependencies, run tests and lint with a variety of Python versions
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Build
+name: CI Tests
 
-on: [push, pull_request]
+on: [push]
 
 jobs:
-  build:
+  unit-tests:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -31,16 +31,18 @@ jobs:
       - name: Lint with flake8
         run: |
           flake8 *.py
-          flake8 tests/*.py
+          flake8 tests/unit/*.py
+          flake8 tests/integration/*/*.py
 
       - name: Format with black
         run: |
           black --check cis_audit.py
-          black --check tests/*.py
+          black --check tests/unit/*.py
+          black --check tests/integration/*/*.py
 
       - name: Test with pytest
         run: |
-          pytest
+          pytest tests/unit
           coverage xml
 
       - name: Codecov
@@ -49,3 +51,30 @@ jobs:
         uses: codecov/codecov-action@v2.1.0
         with:
           files: coverage.xml
+
+  integration-tests:
+    runs-on: macos-12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['centos7']
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Cache Vagrant boxes
+        uses: actions/cache@v3
+        with:
+          path: ~/.vagrant.d/boxes
+          key: ${{ runner.os }}-vagrant-${{ hashFiles('Vagrantfile') }}
+          restore-keys: |
+            ${{ runner.os }}-vagrant-
+
+      - name: Show Vagrant version
+        run: vagrant --version
+
+      - name: Run vagrant up
+        run: vagrant up ${{ matrix.os }}
+
+      - name: Run integration tests on ${{ matrix.os }}
+        run: vagrant ssh ${{ matrix.os }} -c "cd /vagrant && sudo /usr/local/bin/pytest --no-cov tests/integration/${{ matrix.os }}"

@@ -18,6 +18,8 @@ pytest-cov = "*"
 semver = "*"
 vermin = "*"
 tox = "*"
+python-vagrant = "*"
+paramiko = "*"
 
 [requires]
 python_version = "3.6"
