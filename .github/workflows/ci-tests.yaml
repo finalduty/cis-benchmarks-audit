@@ -76,4 +76,4 @@ jobs:
         run: vagrant up ${{ matrix.os }}
 
       - name: Run integration tests on ${{ matrix.os }}
-        run: vagrant ssh ${{ matrix.os }} -c "cd /vagrant && sudo /usr/local/bin/pytest --no-cov tests/integration"
+        run: vagrant ssh ${{ matrix.os }} -c "cd /vagrant && sudo /root/.local/bin/pytest --no-cov tests/integration"
