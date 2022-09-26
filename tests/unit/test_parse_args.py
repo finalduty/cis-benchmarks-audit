@@ -4,8 +4,9 @@
 
 from os import path
 
-import cis_audit
 import pytest
+
+import cis_audit
 
 test = cis_audit.CISAudit()
 

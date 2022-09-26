@@ -7,10 +7,11 @@
 ##          https://jmcgeheeiv.github.io/pyfakefs/release/modules.html#pyfakefs.fake_filesystem.FakeFilesystem.create_dir
 ##          https://jmcgeheeiv.github.io/pyfakefs/release/modules.html#pyfakefs.fake_filesystem.set_uid
 
-from pyfakefs import fake_filesystem
 from unittest.mock import patch
 
 import pytest
+from pyfakefs import fake_filesystem
+
 from cis_audit import CISAudit
 
 

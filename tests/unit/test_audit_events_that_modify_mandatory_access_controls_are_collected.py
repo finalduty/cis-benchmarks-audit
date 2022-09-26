@@ -12,8 +12,8 @@ test = CISAudit()
 
 def mock_audit_events_that_modify_mandatory_access_controls_are_collected_pass(self, cmd):
     stdout = [
-        '-w /etc/selinux/ -p wa -k MAC-policy',
-        '-w /usr/share/selinux/ -p wa -k MAC-policy',
+        '-w /etc/selinux -p wa -k MAC-policy',
+        '-w /usr/share/selinux -p wa -k MAC-policy',
         '',
     ]
     stderr = ['']

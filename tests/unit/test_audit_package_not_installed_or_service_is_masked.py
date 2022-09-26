@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
-from cis_audit import CISAudit
 from unittest.mock import patch
+
 import pytest
+
+from cis_audit import CISAudit
 
 test = CISAudit()
 

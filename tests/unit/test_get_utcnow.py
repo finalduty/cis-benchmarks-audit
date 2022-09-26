@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
-import pytest
-from cis_audit import CISAudit
 from datetime import datetime
+
+import pytest
+
+from cis_audit import CISAudit
 
 test = CISAudit()
 

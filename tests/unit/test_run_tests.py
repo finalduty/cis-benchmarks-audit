@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
-import pytest
-import cis_audit
 from datetime import datetime
 from unittest.mock import patch
+
+import pytest
+
+import cis_audit
 
 
 def mock_run_tests_pass(*args, **kwargs):

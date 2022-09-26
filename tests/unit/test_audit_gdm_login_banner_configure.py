@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
 import os
+from unittest.mock import mock_open, patch
+
 import pytest
 
 # from cis_audit import CISAudit
 import cis_audit
-from unittest.mock import mock_open, patch
 
 test = cis_audit.CISAudit()
 

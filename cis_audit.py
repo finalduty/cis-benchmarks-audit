@@ -9,7 +9,7 @@
 # You can obtain a copy of the CIS Benchmarks from https://www.cisecurity.org/cis-benchmarks/
 # Use of the CIS Benchmarks are subject to the Terms of Use for Non-Member CIS Products - https://www.cisecurity.org/terms-of-use-for-non-member-cis-products
 
-__version__ = '0.20.0-alpha.2'
+__version__ = '0.20.0'
 
 ### Imports ###
 import json  # https://docs.python.org/3/library/json.html
@@ -179,7 +179,7 @@ class CISAudit:
         else:
             for entry in r.stdout[0].split():
                 if entry.startswith('group='):
-                    group = entry.split('=')
+                    group = entry.split('=')[1]
                     break
 
             cmd = f'grep {group} /etc/group'
@@ -203,7 +203,7 @@ class CISAudit:
         return state
 
     def audit_audit_config_is_immutable(self) -> int:
-        cmd = R'grep "^\s*[^#]" /etc/audit/rules.d/*.rules | tail -1'
+        cmd = R'grep -h "^\s*[^#]" /etc/audit/rules.d/*.rules | tail -1'
         r = self._shellexec(cmd)
 
         if r.stdout[0] == '-e 2':
@@ -214,7 +214,7 @@ class CISAudit:
         return state
 
     def audit_audit_log_size_is_configured(self) -> int:
-        cmd = R"grep '^max_log_file\s*=\s*[0-9]+' /etc/audit/auditd.conf"
+        cmd = R"grep -P '^max_log_file\s*=\s*[0-9]+' /etc/audit/auditd.conf"
         r = self._shellexec(cmd)
 
         if r.returncode == 0:
@@ -225,7 +225,7 @@ class CISAudit:
         return state
 
     def audit_audit_logs_not_automatically_deleted(self) -> int:
-        cmd = R"grep '^max_log_file\s*=\s*keep_logs' /etc/audit/auditd.conf"
+        cmd = R"grep '^max_log_file_action\s*=\s*keep_logs' /etc/audit/auditd.conf"
         r = self._shellexec(cmd)
 
         if r.returncode == 0:
@@ -276,12 +276,12 @@ class CISAudit:
             'ExecStart=-/bin/sh -c "/usr/sbin/sulogin; /usr/bin/systemctl --job-mode=fail --no-block default"',
         ]
 
-        cmd = R"grep /sbin/nologin /usr/lib/systemd/system/rescue.service"
+        cmd = R"grep ExecStart= /usr/lib/systemd/system/rescue.service"
         r = self._shellexec(cmd)
         if r.stdout[0] not in success_strings:
             state += 1
 
-        cmd = R"grep /sbin/nologin /usr/lib/systemd/system/rescue.service"
+        cmd = R"grep ExecStart= /usr/lib/systemd/system/rescue.service"
         r = self._shellexec(cmd)
         if r.stdout[0] not in success_strings:
             state += 2
@@ -327,9 +327,9 @@ class CISAudit:
     def audit_core_dumps_restricted(self) -> int:
         state = 0
 
-        cmd = R'grep -E "^\s*\*\s+hard\s+core" /etc/security/limits.conf /etc/security/limits.d/*'
+        cmd = R'grep -hE "^\s*\*\s+hard\s+core" /etc/security/limits.conf /etc/security/limits.d/*'
         r = self._shellexec(cmd)
-        if r.stdout[0] != "* hard core 0":
+        if not re.match(r'\s*\*\s+hard\s+core\s+0', r.stdout[0]):
             state += 1
 
         cmd = R"sysctl fs.suid_dumpable"
@@ -337,7 +337,7 @@ class CISAudit:
         if r.stdout[0] != "fs.suid_dumpable = 0":
             state += 2
 
-        cmd = R'grep "fs\.suid_dumpable" /etc/sysctl.conf /etc/sysctl.d/*'
+        cmd = R'grep -h "fs\.suid_dumpable" /etc/sysctl.conf /etc/sysctl.d/*'
         r = self._shellexec(cmd)
         if r.stdout[0] != "fs.suid_dumpable = 0":
             state += 4
@@ -350,8 +350,11 @@ class CISAudit:
         if os.path.exists('/etc/cron.deny'):
             state += 1
 
-        if self.audit_file_permissions(file="/etc/cron.allow", expected_user="root", expected_group="root", expected_mode="0600") != 0:
+        if not os.path.exists('/etc/cron.allow'):
             state += 2
+        else:
+            if self.audit_file_permissions(file="/etc/cron.allow", expected_user="root", expected_group="root", expected_mode="0600") != 0:
+                state += 4
 
         return state
 
@@ -453,8 +456,8 @@ class CISAudit:
 
     def audit_events_for_changes_to_sysadmin_scope_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k scope' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k scope'"
+        cmd1 = R"grep -h scope /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep scope"
 
         expected_output = [
             '-w /etc/sudoers -p wa -k scope',
@@ -475,10 +478,10 @@ class CISAudit:
 
     def audit_events_for_discretionary_access_control_changes_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k perm_mod' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k perm_mod'"
+        cmd1 = R"grep -h perm_mod /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep perm_mod"
 
-        expected_output = [
+        expected_file_output = [
             '-a always,exit -F arch=b64 -S chmod -S fchmod -S fchmodat -F auid>=1000 -F auid!=4294967295 -k perm_mod',
             '-a always,exit -F arch=b32 -S chmod -S fchmod -S fchmodat -F auid>=1000 -F auid!=4294967295 -k perm_mod',
             '-a always,exit -F arch=b64 -S chown -S fchown -S fchownat -S lchown -F auid>=1000 -F auid!=4294967295 -k perm_mod',
@@ -488,45 +491,61 @@ class CISAudit:
             '',
         ]
 
+        expected_auditctl_output = [
+            '-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=-1 -F key=perm_mod',
+            '-a always,exit -F arch=b32 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=-1 -F key=perm_mod',
+            '-a always,exit -F arch=b64 -S chown,fchown,lchown,fchownat -F auid>=1000 -F auid!=-1 -F key=perm_mod',
+            '-a always,exit -F arch=b32 -S lchown,fchown,chown,fchownat -F auid>=1000 -F auid!=-1 -F key=perm_mod',
+            '-a always,exit -F arch=b64 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=-1 -F key=perm_mod',
+            '-a always,exit -F arch=b32 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=-1 -F key=perm_mod',
+            '',
+        ]
+
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
-
-        if r1.stdout != expected_output:
+        # pdb.set_trace()
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_for_file_deletion_by_users_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k scope' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k scope'"
+        cmd1 = R"grep -h delete /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep delete"
 
-        expected_output = [
+        expected_file_output = [
             '-a always,exit -F arch=b64 -S unlink -S unlinkat -S rename -S renameat -F auid>=1000 -F auid!=4294967295 -k delete',
             '-a always,exit -F arch=b32 -S unlink -S unlinkat -S rename -S renameat -F auid>=1000 -F auid!=4294967295 -k delete',
             '',
         ]
 
+        expected_auditctl_output = [
+            '-a always,exit -F arch=b64 -S rename,unlink,unlinkat,renameat -F auid>=1000 -F auid!=-1 -F key=delete',
+            '-a always,exit -F arch=b32 -S unlink,rename,unlinkat,renameat -F auid>=1000 -F auid!=-1 -F key=delete',
+            '',
+        ]
+
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
-
-        if r1.stdout != expected_output:
+        # pdb.set_trace()
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_for_kernel_module_loading_and_unloading_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k actions' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k actions'"
+        cmd1 = R"grep -h modules /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep modules"
 
-        expected_output = [
+        expected_file_output = [
             '-w /sbin/insmod -p x -k modules',
             '-w /sbin/rmmod -p x -k modules',
             '-w /sbin/modprobe -p x -k modules',
@@ -534,25 +553,33 @@ class CISAudit:
             '',
         ]
 
+        expected_auditctl_output = [
+            '-w /sbin/insmod -p x -k modules',
+            '-w /sbin/rmmod -p x -k modules',
+            '-w /sbin/modprobe -p x -k modules',
+            '-a always,exit -F arch=b64 -S init_module,delete_module -F key=modules',
+            '',
+        ]
+
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_for_login_and_logout_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k logins' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k logins'"
+        cmd1 = R"grep -h logins /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep logins"
 
         expected_output = [
             '-w /var/log/lastlog -p wa -k logins',
-            '-w /var/run/faillock/ -p wa -k logins',
+            '-w /var/run/faillock -p wa -k logins',
             '',
         ]
 
@@ -569,8 +596,8 @@ class CISAudit:
 
     def audit_events_for_session_initiation_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k [buw]tmp' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k logins'"
+        cmd1 = R"grep -h '[buw]tmp' /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep '[buw]tmp'"
 
         expected_output = [
             '-w /var/run/utmp -p wa -k session',
@@ -592,82 +619,109 @@ class CISAudit:
 
     def audit_events_for_successful_file_system_mounts_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k mounts' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k mounts'"
+        cmd1 = R"grep -h mounts /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep mounts"
 
-        expected_output = [
+        expected_file_output = [
             '-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=4294967295 -k mounts',
             '-a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=4294967295 -k mounts',
+            '',
+        ]
+
+        expected_auditctl_output = [
+            '-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=-1 -F key=mounts',
+            '-a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=-1 -F key=mounts',
             '',
         ]
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_for_system_administrator_commands_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k actions' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k actions'"
+        cmd1 = R"grep -h actions /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep actions"
 
-        expected_output = [
-            '-a exit,always -F arch=b64 -C euid!=uid -F euid=0 -Fauid>=1000 -F auid!=4294967295 -S execve -k actions',
-            '-a exit,always -F arch=b32 -C euid!=uid -F euid=0 -Fauid>=1000 -F auid!=4294967295 -S execve -k actions',
+        expected_file_output = [
+            '-a exit,always -F arch=b64 -C euid!=uid -F euid=0 -F auid>=1000 -F auid!=4294967295 -S execve -k actions',
+            '-a exit,always -F arch=b32 -C euid!=uid -F euid=0 -F auid>=1000 -F auid!=4294967295 -S execve -k actions',
+            '',
+        ]
+        expected_auditctl_output = [
+            '-a always,exit -F arch=b64 -S execve -C uid!=euid -F euid=0 -F auid>=1000 -F auid!=-1 -F key=actions',
+            '-a always,exit -F arch=b32 -S execve -C uid!=euid -F euid=0 -F auid>=1000 -F auid!=-1 -F key=actions',
             '',
         ]
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_for_unsuccessful_file_access_attempts_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k mounts' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k mounts'"
+        cmd1 = R"grep -h access /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep access"
 
-        expected_output = [
+        expected_file_output = [
             '-a always,exit -F arch=b64 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k access',
             '-a always,exit -F arch=b32 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k access',
             '-a always,exit -F arch=b64 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k access',
             '-a always,exit -F arch=b32 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k access',
             '',
         ]
+        expected_auditctl_output = [
+            '-a always,exit -F arch=b64 -S open,truncate,ftruncate,creat,openat -F exit=-EACCES -F auid>=1000 -F auid!=-1 -F key=access',
+            '-a always,exit -F arch=b32 -S open,creat,truncate,ftruncate,openat -F exit=-EACCES -F auid>=1000 -F auid!=-1 -F key=access',
+            '-a always,exit -F arch=b64 -S open,truncate,ftruncate,creat,openat -F exit=-EPERM -F auid>=1000 -F auid!=-1 -F key=access',
+            '-a always,exit -F arch=b32 -S open,creat,truncate,ftruncate,openat -F exit=-EPERM -F auid>=1000 -F auid!=-1 -F key=access',
+            '',
+        ]
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_that_modify_datetime_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k time-change' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k time-change'"
+        cmd1 = R"grep -h time-change /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep time-change"
 
-        expected_output = [
+        expected_file_output = [
             '-a always,exit -F arch=b64 -S adjtimex -S settimeofday -k time-change',
-            '-a always,exit -F arch=b32 -S adjtimex -S settimeofday -S stime -k time- change',
+            '-a always,exit -F arch=b32 -S adjtimex -S settimeofday -S stime -k time-change',
             '-a always,exit -F arch=b64 -S clock_settime -k time-change',
             '-a always,exit -F arch=b32 -S clock_settime -k time-change',
+            '-w /etc/localtime -p wa -k time-change',
+            '',
+        ]
+
+        expected_auditctl_output = [
+            '-a always,exit -F arch=b64 -S adjtimex,settimeofday -F key=time-change',
+            '-a always,exit -F arch=b32 -S stime,settimeofday,adjtimex -F key=time-change',
+            '-a always,exit -F arch=b64 -S clock_settime -F key=time-change',
+            '-a always,exit -F arch=b32 -S clock_settime -F key=time-change',
             '-w /etc/localtime -p wa -k time-change',
             '',
         ]
@@ -675,22 +729,22 @@ class CISAudit:
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_that_modify_mandatory_access_controls_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k MAC-policy' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k MAC-policy'"
+        cmd1 = R"grep -h MAC-policy /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep MAC-policy"
 
         expected_output = [
-            '-w /etc/selinux/ -p wa -k MAC-policy',
-            '-w /usr/share/selinux/ -p wa -k MAC-policy',
+            '-w /etc/selinux -p wa -k MAC-policy',
+            '-w /usr/share/selinux -p wa -k MAC-policy',
             '',
         ]
 
@@ -707,12 +761,22 @@ class CISAudit:
 
     def audit_events_that_modify_network_environment_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k system-locale' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k system-locale'"
+        cmd1 = R"grep -h system-locale /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep system-locale"
 
-        expected_output = [
+        expected_file_output = [
             '-a always,exit -F arch=b64 -S sethostname -S setdomainname -k system-locale',
             '-a always,exit -F arch=b32 -S sethostname -S setdomainname -k system-locale',
+            '-w /etc/issue -p wa -k system-locale',
+            '-w /etc/issue.net -p wa -k system-locale',
+            '-w /etc/hosts -p wa -k system-locale',
+            '-w /etc/sysconfig/network -p wa -k system-locale',
+            '',
+        ]
+
+        expected_auditctl_output = [
+            '-a always,exit -F arch=b64 -S sethostname,setdomainname -F key=system-locale',
+            '-a always,exit -F arch=b32 -S sethostname,setdomainname -F key=system-locale',
             '-w /etc/issue -p wa -k system-locale',
             '-w /etc/issue.net -p wa -k system-locale',
             '-w /etc/hosts -p wa -k system-locale',
@@ -723,20 +787,20 @@ class CISAudit:
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_that_modify_usergroup_info_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k identity' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k identity'"
+        cmd1 = R"grep -h identity /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep identity"
 
-        expected_output = [
+        expected_file_output = [
             '-w /etc/group -p wa -k identity',
             '-w /etc/passwd -p wa -k identity',
             '-w /etc/gshadow -p wa -k identity',
@@ -745,13 +809,15 @@ class CISAudit:
             '',
         ]
 
+        expected_auditctl_output = ['-w /etc/group -p wa -k identity', '-w /etc/passwd -p wa -k identity', '-w /etc/gshadow -p wa -k identity', '-w /etc/shadow -p wa -k identity', '-w /etc/security/opasswd -p wa -k identity', '']
+
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state

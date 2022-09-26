@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
 from types import SimpleNamespace
-import cis_audit
-import pytest
 from unittest.mock import patch
+
+import pytest
+
+import cis_audit
 
 
 class MockFilePermissions:

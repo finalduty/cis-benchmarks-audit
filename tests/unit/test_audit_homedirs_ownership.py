@@ -11,9 +11,9 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-from cis_audit import CISAudit
-
 from pyfakefs import fake_filesystem
+
+from cis_audit import CISAudit
 
 
 def mock_homedirs_data(self, cmd):

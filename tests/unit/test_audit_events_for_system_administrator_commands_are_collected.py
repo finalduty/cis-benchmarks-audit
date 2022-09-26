@@ -11,11 +11,19 @@ test = CISAudit()
 
 
 def mock_audit_events_for_system_administrator_commands_are_collected_pass(self, cmd):
-    stdout = [
-        '-a exit,always -F arch=b64 -C euid!=uid -F euid=0 -Fauid>=1000 -F auid!=4294967295 -S execve -k actions',
-        '-a exit,always -F arch=b32 -C euid!=uid -F euid=0 -Fauid>=1000 -F auid!=4294967295 -S execve -k actions',
-        '',
-    ]
+    if 'auditctl' in cmd:
+        stdout = [
+            '-a always,exit -F arch=b64 -S execve -C uid!=euid -F euid=0 -F auid>=1000 -F auid!=-1 -F key=actions',
+            '-a always,exit -F arch=b32 -S execve -C uid!=euid -F euid=0 -F auid>=1000 -F auid!=-1 -F key=actions',
+            '',
+        ]
+    else:
+        stdout = [
+            '-a exit,always -F arch=b64 -C euid!=uid -F euid=0 -F auid>=1000 -F auid!=4294967295 -S execve -k actions',
+            '-a exit,always -F arch=b32 -C euid!=uid -F euid=0 -F auid>=1000 -F auid!=4294967295 -S execve -k actions',
+            '',
+        ]
+
     stderr = ['']
     returncode = 0
 

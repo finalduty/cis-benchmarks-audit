@@ -2,7 +2,9 @@
 ## andy.dustin@gmail.com [rev: 83422a0e]
 
 from types import SimpleNamespace
+
 import pytest
+
 from cis_audit import CISAudit
 
 

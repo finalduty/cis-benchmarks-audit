@@ -11,14 +11,24 @@ test = CISAudit()
 
 
 def mock_audit_events_that_modify_datetime_are_collected_pass(self, cmd):
-    stdout = [
-        '-a always,exit -F arch=b64 -S adjtimex -S settimeofday -k time-change',
-        '-a always,exit -F arch=b32 -S adjtimex -S settimeofday -S stime -k time- change',
-        '-a always,exit -F arch=b64 -S clock_settime -k time-change',
-        '-a always,exit -F arch=b32 -S clock_settime -k time-change',
-        '-w /etc/localtime -p wa -k time-change',
-        '',
-    ]
+    if 'auditctl' in cmd:
+        stdout = [
+            '-a always,exit -F arch=b64 -S adjtimex,settimeofday -F key=time-change',
+            '-a always,exit -F arch=b32 -S stime,settimeofday,adjtimex -F key=time-change',
+            '-a always,exit -F arch=b64 -S clock_settime -F key=time-change',
+            '-a always,exit -F arch=b32 -S clock_settime -F key=time-change',
+            '-w /etc/localtime -p wa -k time-change',
+            '',
+        ]
+    else:
+        stdout = [
+            '-a always,exit -F arch=b64 -S adjtimex -S settimeofday -k time-change',
+            '-a always,exit -F arch=b32 -S adjtimex -S settimeofday -S stime -k time-change',
+            '-a always,exit -F arch=b64 -S clock_settime -k time-change',
+            '-a always,exit -F arch=b32 -S clock_settime -k time-change',
+            '-w /etc/localtime -p wa -k time-change',
+            '',
+        ]
     stderr = ['']
     returncode = 0
 

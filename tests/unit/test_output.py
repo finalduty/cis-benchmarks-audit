@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-from mock import patch
 import pytest
+from mock import patch
 
 from cis_audit import CISAudit
 

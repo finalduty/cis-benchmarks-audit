@@ -11,15 +11,26 @@ test = CISAudit()
 
 
 def mock_audit_events_that_modify_network_environment_are_collected_pass(self, cmd):
-    stdout = [
-        '-a always,exit -F arch=b64 -S sethostname -S setdomainname -k system-locale',
-        '-a always,exit -F arch=b32 -S sethostname -S setdomainname -k system-locale',
-        '-w /etc/issue -p wa -k system-locale',
-        '-w /etc/issue.net -p wa -k system-locale',
-        '-w /etc/hosts -p wa -k system-locale',
-        '-w /etc/sysconfig/network -p wa -k system-locale',
-        '',
-    ]
+    if 'auditctl' in cmd:
+        stdout = [
+            '-a always,exit -F arch=b64 -S sethostname,setdomainname -F key=system-locale',
+            '-a always,exit -F arch=b32 -S sethostname,setdomainname -F key=system-locale',
+            '-w /etc/issue -p wa -k system-locale',
+            '-w /etc/issue.net -p wa -k system-locale',
+            '-w /etc/hosts -p wa -k system-locale',
+            '-w /etc/sysconfig/network -p wa -k system-locale',
+            '',
+        ]
+    else:
+        stdout = [
+            '-a always,exit -F arch=b64 -S sethostname -S setdomainname -k system-locale',
+            '-a always,exit -F arch=b32 -S sethostname -S setdomainname -k system-locale',
+            '-w /etc/issue -p wa -k system-locale',
+            '-w /etc/issue.net -p wa -k system-locale',
+            '-w /etc/hosts -p wa -k system-locale',
+            '-w /etc/sysconfig/network -p wa -k system-locale',
+            '',
+        ]
     stderr = ['']
     returncode = 0
 

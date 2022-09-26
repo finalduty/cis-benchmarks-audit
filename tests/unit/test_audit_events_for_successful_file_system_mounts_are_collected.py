@@ -11,11 +11,19 @@ test = CISAudit()
 
 
 def mock_audit_events_for_successful_file_system_mounts_are_collected_pass(self, cmd):
-    stdout = [
-        '-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=4294967295 -k mounts',
-        '-a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=4294967295 -k mounts',
-        '',
-    ]
+    if 'auditctl' in cmd:
+        stdout = [
+            '-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=-1 -F key=mounts',
+            '-a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=-1 -F key=mounts',
+            '',
+        ]
+    else:
+        stdout = [
+            '-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=4294967295 -k mounts',
+            '-a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=4294967295 -k mounts',
+            '',
+        ]
+
     stderr = ['']
     returncode = 0
 

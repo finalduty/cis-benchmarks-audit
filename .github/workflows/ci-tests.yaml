@@ -31,14 +31,12 @@ jobs:
       - name: Lint with flake8
         run: |
           flake8 *.py
-          flake8 tests/unit/*.py
-          flake8 tests/integration/*/*.py
+          flake8 tests/*/*.py
 
       - name: Format with black
         run: |
           black --check cis_audit.py
-          black --check tests/unit/*.py
-          black --check tests/integration/*/*.py
+          black --check tests/*/*.py
 
       - name: Test with pytest
         run: |
@@ -54,6 +52,7 @@ jobs:
 
   integration-tests:
     runs-on: macos-12
+    needs: unit-tests
     strategy:
       fail-fast: false
       matrix:
@@ -77,4 +76,4 @@ jobs:
         run: vagrant up ${{ matrix.os }}
 
       - name: Run integration tests on ${{ matrix.os }}
-        run: vagrant ssh ${{ matrix.os }} -c "cd /vagrant && sudo /usr/local/bin/pytest --no-cov tests/integration/${{ matrix.os }}"
+        run: vagrant ssh ${{ matrix.os }} -c "cd /vagrant && sudo /usr/local/bin/pytest --no-cov tests/integration"
