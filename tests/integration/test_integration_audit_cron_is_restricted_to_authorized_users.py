@@ -11,7 +11,7 @@ from tests.integration import shellexec
 @pytest.fixture()
 def setup_to_pass():
     shellexec('install -o root -g root -m 0600 /dev/null /etc/cron.allow')
-    if os.path.exists('/etc.cron.deny'):
+    if os.path.exists('/etc/cron.deny'):
         os.remove('/etc/cron.deny')
 
     yield None
@@ -22,7 +22,7 @@ def setup_to_pass():
 @pytest.fixture()
 def setup_to_fail_exists():
     shellexec('touch /etc/cron.deny')
-    if os.path.exists('/etc.cron.allow'):
+    if os.path.exists('/etc/cron.allow'):
         os.remove('/etc/cron.allow')
 
     yield None
@@ -33,7 +33,7 @@ def setup_to_fail_exists():
 @pytest.fixture()
 def setup_to_fail_permissions():
     shellexec('touch /etc/cron.allow')
-    if os.path.exists('/etc.cron.deny'):
+    if os.path.exists('/etc/cron.deny'):
         os.remove('/etc/cron.deny')
 
     yield None
