@@ -9,15 +9,52 @@ from cis_audit import CISAudit
 
 
 def mock_iptables_rules_are_saved_pass(self, cmd):
-    stdout = ['Files /dev/fd/63 and /dev/fd/62 are identical']
+    stdout = [
+        'COMMIT',
+        '*filter',
+        ':FORWARD ACCEPT ',
+        ':INPUT ACCEPT ',
+        ':OUTPUT ACCEPT ',
+        '',
+    ]
     stderr = ['']
     returncode = 0
 
     return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)
 
 
-def mock_iptables_rules_are_saved_fail(self, cmd):
-    stdout = ['Files /dev/fd/63 and /dev/fd/62 differ']
+def mock_iptables_rules_are_saved_fail_ipv4(self, cmd):
+    if 'iptables-save' in cmd:
+        stdout = [
+            'COMMIT',
+            '*filter',
+            ':FORWARD ACCEPT ',
+            ':INPUT ACCEPT ',
+            ':OUTPUT ACCEPT ',
+            '',
+        ]
+    else:
+        stdout = ['']
+
+    stderr = ['']
+    returncode = 0
+
+    return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)
+
+
+def mock_iptables_rules_are_saved_fail_ipv6(self, cmd):
+    if 'ip6tables-save' in cmd:
+        stdout = [
+            'COMMIT',
+            '*filter',
+            ':FORWARD ACCEPT ',
+            ':INPUT ACCEPT ',
+            ':OUTPUT ACCEPT ',
+            '',
+        ]
+    else:
+        stdout = ['']
+
     stderr = ['']
     returncode = 0
 
@@ -34,7 +71,7 @@ def test_audit_iptables_rules_are_saved_pass():
     assert state == 0
 
 
-@patch.object(CISAudit, "_shellexec", mock_iptables_rules_are_saved_fail)
+@patch.object(CISAudit, "_shellexec", mock_iptables_rules_are_saved_fail_ipv4)
 def test_audit_iptables_rules_are_saved_fail():
     state = test.audit_iptables_rules_are_saved(ip_version='ipv4')
     assert state == 1
@@ -47,7 +84,7 @@ def test_audit_ip6tables_rules_are_saved_pass():
     assert state == 0
 
 
-@patch.object(CISAudit, "_shellexec", mock_iptables_rules_are_saved_fail)
+@patch.object(CISAudit, "_shellexec", mock_iptables_rules_are_saved_fail_ipv6)
 def test_audit_ip6tables_rules_are_saved_fail():
     state = test.audit_iptables_rules_are_saved(ip_version='ipv6')
     assert state == 1

@@ -20,7 +20,7 @@ def mock_audit_package_is_installed_false(*args, **kwargs):
 
 
 @patch.object(cis_audit.CISAudit, "audit_package_is_installed", mock_audit_package_is_installed_false)
-def test_audit_gdm_last_user_logged_in_disabled_skipped():
+def test_audit_gdm_last_user_logged_in_disabled_error_not_installed():
     state = test.audit_gdm_last_user_logged_in_disabled()
     assert state == -2
 

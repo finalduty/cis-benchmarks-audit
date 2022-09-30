@@ -45,23 +45,22 @@ def mock_filesystem_integrity_error(self, cmd):
     raise Exception
 
 
-class TestFilesystemIntegrityRegularlyChecked:
-    test = CISAudit()
+@patch.object(CISAudit, "_shellexec", mock_filesystem_integrity_pass_cron)
+def test_filesystem_integrity_pass_crond():
+    state = CISAudit().audit_filesystem_integrity_regularly_checked()
+    assert state == 0
 
-    @patch.object(CISAudit, "_shellexec", mock_filesystem_integrity_pass_cron)
-    def test_filesystem_integrity_pass_crond(self):
-        state = self.test.audit_filesystem_integrity_regularly_checked()
-        assert state == 0
 
-    @patch.object(CISAudit, "_shellexec", mock_filesystem_integrity_pass_systemd)
-    def test_filesystem_integrity_pass_systemd(self):
-        state = self.test.audit_filesystem_integrity_regularly_checked()
-        assert state == 0
+@patch.object(CISAudit, "_shellexec", mock_filesystem_integrity_pass_systemd)
+def test_filesystem_integrity_pass_systemd():
+    state = CISAudit().audit_filesystem_integrity_regularly_checked()
+    assert state == 0
 
-    @patch.object(CISAudit, "_shellexec", mock_filesystem_integrity_fail)
-    def test_filesystem_integrity_fail(self):
-        state = self.test.audit_filesystem_integrity_regularly_checked()
-        assert state == 1
+
+@patch.object(CISAudit, "_shellexec", mock_filesystem_integrity_fail)
+def test_filesystem_integrity_fail():
+    state = CISAudit().audit_filesystem_integrity_regularly_checked()
+    assert state == 1
 
 
 if __name__ == '__main__':

@@ -9,11 +9,7 @@ from cis_audit import CISAudit
 
 
 def mock_iptables_is_flushed_pass(self, cmd, **kwargs):
-    output = [
-        '-P INPUT ACCEPT',
-        '-P FORWARD ACCEPT',
-        '-P OUTPUT ACCEPT',
-    ]
+    output = ['']
     error = ['']
     returncode = 0
 
@@ -22,9 +18,6 @@ def mock_iptables_is_flushed_pass(self, cmd, **kwargs):
 
 def mock_iptables_is_flushed_fail(self, cmd, **kwargs):
     output = [
-        '-P INPUT ACCEPT',
-        '-P FORWARD ACCEPT',
-        '-P OUTPUT ACCEPT',
         '-A INPUT -i lo -j ACCEPT',
     ]
     error = ['']

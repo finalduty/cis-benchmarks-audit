@@ -40,25 +40,25 @@ test = CISAudit()
 
 
 @patch.object(CISAudit, "_shellexec", mock_iptables_default_deny_pass)
-def test_audit_iptables_default_deny_pass():
+def test_audit_iptables_default_deny_pass_ipv4():
     state = test.audit_iptables_default_deny_policy(ip_version='ipv4')
     assert state == 0
 
 
 @patch.object(CISAudit, "_shellexec", mock_iptables_default_deny_fail)
-def test_audit_iptables_default_deny_fail():
+def test_audit_iptables_default_deny_fail_ipv4():
     state = test.audit_iptables_default_deny_policy(ip_version='ipv4')
     assert state == 7
 
 
 @patch.object(CISAudit, "_shellexec", mock_iptables_default_deny_pass)
-def test_audit_ip6tables_default_deny_pass():
+def test_audit_iptables_default_deny_pass_ipv6():
     state = test.audit_iptables_default_deny_policy(ip_version='ipv6')
     assert state == 0
 
 
 @patch.object(CISAudit, "_shellexec", mock_iptables_default_deny_fail)
-def test_audit_ip6tables_default_deny_fail():
+def test_audit_iptables_default_deny_fail_ipv6():
     state = test.audit_iptables_default_deny_policy(ip_version='ipv6')
     assert state == 7
 

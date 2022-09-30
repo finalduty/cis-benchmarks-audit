@@ -39,7 +39,7 @@ def test_audit_gdm_login_banner_configured_fail(MagickMock):
     assert state == 46
 
 
-@patch.object(cis_audit, "open", mock_open(read_data='user-db:user\nsystem-db:gdm\nfile-db:/usr/share/gdm/greeter-dconf-defaults\n[org/gnome/login-screen\nbanner-message-enable=true\nbanner-message-text='))
+@patch.object(cis_audit, "open", mock_open(read_data='user-db:user\nsystem-db:gdm\nfile-db:/usr/share/gdm/greeter-dconf-defaults\n[org/gnome/login-screen]\nbanner-message-enable=true\nbanner-message-text='))
 @patch.object(os.path, "exists", return_value=True)
 @patch.object(cis_audit.CISAudit, "audit_package_is_installed", mock_audit_package_is_installed_true)
 def test_audit_gdm_login_banner_configured_pass(MagickMock):

@@ -28,13 +28,13 @@ test = CISAudit()
 
 
 @patch.object(CISAudit, "_shellexec", mock_firewalld_default_zone_is_set)
-def test_only_one_package_is_installed_pass():
+def test_firewalld_defaullt_zone_set_pass():
     state = test.audit_firewalld_default_zone_is_set()
     assert state == 0
 
 
 @patch.object(CISAudit, "_shellexec", mock_firewalld_not_running)
-def test_only_one_package_is_installed_fail_both_installed():
+def test_firewalld_not_running():
     state = test.audit_firewalld_default_zone_is_set()
     assert state == 1
 

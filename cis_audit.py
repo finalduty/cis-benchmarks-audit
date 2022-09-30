@@ -925,7 +925,7 @@ class CISAudit:
     def audit_filesystem_integrity_regularly_checked(self) -> int:
         state = 1
 
-        cmd = R'grep -r aide /etc/cron.* /etc/crontab /var/spool/cron/root /etc/anacrontab'
+        cmd = R"grep -Ers '^([^#]+\s+)?(\/usr\/s?bin\/|^\s*)aide(\.wrapper)?\s(--?\S+\s)*(--(check|update)|\$AIDEARGS)\b' /etc/cron.* /etc/crontab /var/spool/cron/root /etc/anacrontab"
         r = self._shellexec(cmd)
 
         if r.stdout[0] != '':
@@ -981,7 +981,7 @@ class CISAudit:
                 state += 1
 
             ## Test contents of /etc/dconf/db/gdm.d/01-banner-message, if it exists
-            file = "/etc/dconf/db/gdm.d/01-banner-message"
+            file = "/etc/dconf/db/gdm.d/00-login-screen"
             if os.path.exists(file):
                 with open(file) as f:
                     contents = f.read()
@@ -1018,7 +1018,7 @@ class CISAudit:
             if os.path.exists(file):
                 with open(file) as f:
                     contents = f.read()
-                    if "[org/gnome/login-screen\nbanner-message-enable=true\nbanner-message-text=" not in contents:
+                    if "[org/gnome/login-screen]\nbanner-message-enable=true\nbanner-message-text=" not in contents:
                         state += 32
             else:
                 state += 16
@@ -1035,7 +1035,8 @@ class CISAudit:
         if r.stdout[0] != 'gpgcheck=1':
             state += 1
 
-        cmd = R"awk -v 'RS=[' -F '\n' '/\n\s*name\s*=\s*.*$/ && ! /\n\s*enabled\s*=\s*0(\W.*)?$/ && ! /\n\s*gpgcheck\s*=\s*1(\W.*)?$/ { t=substr($1, 1, index($1, \"]\")-1); print t, \"does not have gpgcheck enabled.\" }' /etc/yum.repos.d/*.repo"
+        cmd = R"grep -P '^\h*gpgcheck=[^1\n\r]+\b(\h+.*)?$' /etc/yum.repos.d/*.repo"
+        # cmd = R"awk -v 'RS=[' -F '\n' '/\n\s*name\s*=\s*.*$/ && ! /\n\s*enabled\s*=\s*0(\W.*)?$/ && ! /\n\s*gpgcheck\s*=\s*1(\W.*)?$/ { t=substr($1, 1, index($1, \"]\")-1); print t, \"does not have gpgcheck enabled.\" }' /etc/yum.repos.d/*.repo"
         r = self._shellexec(cmd)
 
         if r.stdout[0] != '':
@@ -1108,22 +1109,14 @@ class CISAudit:
     def audit_iptables_is_flushed(self) -> int:
         state = 0
 
-        cmd = R"iptables -S"
+        cmd = R"iptables -S | grep -v -- -P"
         r = self._shellexec(cmd)
-        if r.stdout != [
-            "-P INPUT ACCEPT",
-            "-P FORWARD ACCEPT",
-            "-P OUTPUT ACCEPT",
-        ]:
+        if r.stdout != ['']:
             state += 1
 
-        cmd = R"ip6tables -S"
+        cmd = R"ip6tables -S | grep -v -- -P"
         r = self._shellexec(cmd)
-        if r.stdout != [
-            "-P INPUT ACCEPT",
-            "-P FORWARD ACCEPT",
-            "-P OUTPUT ACCEPT",
-        ]:
+        if r.stdout != ['']:
             state += 2
 
         return state
@@ -1141,22 +1134,21 @@ class CISAudit:
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        regex = re.compile('^-P INPUT (ACCEPT|REJECT|DROP)$')
-        if regex.match(r1.stdout[0]) is None:
-            state += 1
+        self.log.debug(r1)
+        self.log.debug(r2)
 
         if len(r1.stdout) < 2 or r1.stdout[1] != '-A INPUT -i lo -j ACCEPT':
-            state += 2
+            state += 1
 
-        if len(r1.stdout) < 3 or r1.stdout[2] != '-A INPUT -s 127.0.0.0/8 -j DROP':
-            state += 4
-
-        regex = re.compile('^-P OUTPUT (ACCEPT|REJECT|DROP)$')
-        if regex.match(r2.stdout[0]) is None:
-            state += 8
+        if ip_version == 'ipv4':
+            if len(r1.stdout) < 3 or r1.stdout[2] != '-A INPUT -s 127.0.0.0/8 -j DROP':
+                state += 2
+        elif ip_version == 'ipv6':
+            if len(r1.stdout) < 3 or r1.stdout[2] != '-A INPUT -s ::1/128 -j DROP':
+                state += 2
 
         if len(r2.stdout) < 2 or r2.stdout[1] != '-A OUTPUT -o lo -j ACCEPT':
-            state += 16
+            state += 4
 
         return state
 
@@ -1169,6 +1161,8 @@ class CISAudit:
             cmd = R"ip6tables -S"
 
         r = self._shellexec(cmd)
+
+        self.log.debug(r)
 
         if '-A INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT' not in r.stdout:
             state += 1
@@ -1192,12 +1186,22 @@ class CISAudit:
 
     def audit_iptables_rules_are_saved(self, ip_version: str) -> int:
         if ip_version == 'ipv4':
-            cmd = R"diff -qs -y <(iptables-save | grep -v '^#' | sed 's/\[[0-9]*:[0-9]*\]//' | sort) <(grep -v '^#' /etc/sysconfig/iptables | sed 's/\[[0-9]*:[0-9]*\]//' | sort)"
+            # cmd = R"diff -qs -y <(iptables-save | grep -v '^#' | sed 's/\[[0-9]*:[0-9]*\]//' | sort) <(grep -v '^#' /etc/sysconfig/iptables | sed 's/\[[0-9]*:[0-9]*\]//' | sort)"
+            cmd1 = R"iptables-save | grep -v '^#' | sed 's/\[[0-9]*:[0-9]*\]//' | sort"
+            cmd2 = R"grep -v '^#' /etc/sysconfig/iptables | sed 's/\[[0-9]*:[0-9]*\]//' | sort"
         elif ip_version == 'ipv6':
-            cmd = R"diff -qs -y <(ip6tables-save | grep -v '^#' | sed 's/\[[0-9]*:[0-9]*\]//' | sort) <(grep -v '^#' /etc/sysconfig/ip6tables | sed 's/\[[0-9]*:[0-9]*\]//' | sort)"
-        r = self._shellexec(cmd)
+            # cmd = R"diff -qs -y <(ip6tables-save | grep -v '^#' | sed 's/\[[0-9]*:[0-9]*\]//' | sort) <(grep -v '^#' /etc/sysconfig/ip6tables | sed 's/\[[0-9]*:[0-9]*\]//' | sort)"
+            cmd1 = R"ip6tables-save | grep -v '^#' | sed 's/\[[0-9]*:[0-9]*\]//' | sort"
+            cmd2 = R"grep -v '^#' /etc/sysconfig/ip6tables | sed 's/\[[0-9]*:[0-9]*\]//' | sort"
 
-        if r.returncode == 0 and r.stdout[0] == 'Files /dev/fd/63 and /dev/fd/62 are identical':
+        # r = self._shellexec(cmd)
+        r1 = self._shellexec(cmd1)
+        r2 = self._shellexec(cmd2)
+
+        self.log.debug(r1)
+        self.log.debug(r2)
+
+        if r1.returncode == 0 and r2.returncode == 0 and r1.stdout == r2.stdout:
             state = 0
         else:
             state = 1
