@@ -30,6 +30,14 @@ def mock_updates_fail(*args, **kwargs):
     return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)
 
 
+def mock_updates_error(*args, **kwargs):
+    stdout = ['Loaded plugins: fastestmirror']
+    stderr = ['No such command: checkupdate. Please use /bin/yum --help']
+    returncode = 1
+
+    return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)
+
+
 @patch.object(CISAudit, "_shellexec", mock_updates_pass)
 def test_audit_updates_installed_pass():
     state = test.audit_updates_installed()
@@ -40,6 +48,12 @@ def test_audit_updates_installed_pass():
 def test_audit_updates_installed_fail():
     state = test.audit_updates_installed()
     assert state == 1
+
+
+@patch.object(CISAudit, "_shellexec", mock_updates_error)
+def test_audit_updates_installed_error():
+    state = test.audit_updates_installed()
+    assert state == -1
 
 
 if __name__ == '__main__':
