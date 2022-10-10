@@ -10,67 +10,46 @@ from cis_audit import CISAudit
 test = CISAudit()
 
 
-def mock_password_inactive_lock_is_configured_pass(self, cmd):
+def mock_password_expiration_warning_is_configured_pass(self, cmd):
     returncode = 0
     stderr = ['']
 
-    if 'INACTIVE' in cmd:
-        stdout = ['INACTIVE=30']
+    if 'PASS_WARN_AGE' in cmd:
+        stdout = ['PASS_WARN_AGE    7']
     elif 'shadow' in cmd:
         stdout = [
-            'root:30',
-            'vagrant:30',
+            'root:7',
+            'vagrant:7',
         ]
 
     return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)
 
 
-def mock_password_inactive_lock_is_configured_fail(self, cmd):
+def mock_password_expiration_warning_is_configured_fail(self, cmd):
     returncode = 0
     stderr = ['']
 
-    if 'INACTIVE' in cmd:
-        stdout = ['INACTIVE=99999']
+    if 'PASS_WARN_AGE' in cmd:
+        stdout = ['PASS_WARN_AGE    0']
     elif 'shadow' in cmd:
         stdout = [
-            'root:99999',
-            'vagrant:99999',
+            'root:0',
+            'vagrant:0',
         ]
 
     return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)
 
 
-def mock_password_inactive_lock_is_disabled_fail(self, cmd):
-    returncode = 0
-    stderr = ['']
-
-    if 'INACTIVE' in cmd:
-        stdout = ['INACTIVE=-1']
-    elif 'shadow' in cmd:
-        stdout = [
-            'root:',
-            'vagrant:',
-        ]
-
-    return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)
-
-
-@patch.object(CISAudit, "_shellexec", mock_password_inactive_lock_is_configured_pass)
-def test_audit_password_inactive_lock_is_configured_pass():
-    state = test.audit_password_inactive_lock_is_configured()
+@patch.object(CISAudit, "_shellexec", mock_password_expiration_warning_is_configured_pass)
+def test_audit_password_expiration_warning_is_configured_pass():
+    state = test.audit_password_expiration_warning_is_configured()
     assert state == 0
 
 
-@patch.object(CISAudit, "_shellexec", mock_password_inactive_lock_is_configured_fail)
-def test_audit_password_inactive_lock_is_configured_fail():
-    state = test.audit_password_inactive_lock_is_configured()
-    assert state == 9
-
-
-@patch.object(CISAudit, "_shellexec", mock_password_inactive_lock_is_disabled_fail)
-def test_audit_password_inactive_lock_is_disabled_fail():
-    state = test.audit_password_inactive_lock_is_configured()
-    assert state == 6
+@patch.object(CISAudit, "_shellexec", mock_password_expiration_warning_is_configured_fail)
+def test_audit_password_expiration_warning_is_configured_pass_fail():
+    state = test.audit_password_expiration_warning_is_configured()
+    assert state == 3
 
 
 if __name__ == '__main__':

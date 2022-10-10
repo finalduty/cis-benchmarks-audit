@@ -19,7 +19,6 @@ def mock_audit_events_that_modify_network_environment_are_collected_pass(self, c
             '-w /etc/issue.net -p wa -k system-locale',
             '-w /etc/hosts -p wa -k system-locale',
             '-w /etc/sysconfig/network -p wa -k system-locale',
-            '',
         ]
     else:
         stdout = [
@@ -29,7 +28,6 @@ def mock_audit_events_that_modify_network_environment_are_collected_pass(self, c
             '-w /etc/issue.net -p wa -k system-locale',
             '-w /etc/hosts -p wa -k system-locale',
             '-w /etc/sysconfig/network -p wa -k system-locale',
-            '',
         ]
     stderr = ['']
     returncode = 0

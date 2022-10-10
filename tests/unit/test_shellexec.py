@@ -15,8 +15,9 @@ def test_shellexec_stdout_pass():
 
 
 def test_shellexec_sterr_pass():
-    result = test._shellexec('echo stderr | tee /dev/stderr')
+    result = test._shellexec('echo stderr | tee /dev/stderr 1>/dev/null')
     assert result.returncode == 0
+    assert result.stdout[0] == ''
     assert result.stderr[0] == 'stderr'
 
 

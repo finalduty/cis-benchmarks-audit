@@ -17,7 +17,6 @@ def mock_audit_events_that_modify_usergroup_info_are_collected_pass(self, cmd):
         '-w /etc/gshadow -p wa -k identity',
         '-w /etc/shadow -p wa -k identity',
         '-w /etc/security/opasswd -p wa -k identity',
-        '',
     ]
     stderr = ['']
     returncode = 0

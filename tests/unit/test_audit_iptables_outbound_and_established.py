@@ -37,26 +37,26 @@ test = CISAudit()
 ## IPv4
 @patch.object(CISAudit, "_shellexec", mock_iptables_outbound_and_established_pass)
 def test_audit_iptables_outbound_and_established_ipv4_pass():
-    state = test.audit_iptables_outbound_and_established(ip_version='ipv4')
+    state = test.audit_iptables_outbound_and_established_connections(ip_version='ipv4')
     assert state == 0
 
 
 @patch.object(CISAudit, "_shellexec", mock_iptables_outbound_and_established_fail)
 def test_audit_iptables_outbound_and_established_ipv4_fail():
-    state = test.audit_iptables_outbound_and_established(ip_version='ipv4')
+    state = test.audit_iptables_outbound_and_established_connections(ip_version='ipv4')
     assert state == 63
 
 
 ## IPv6
 @patch.object(CISAudit, "_shellexec", mock_iptables_outbound_and_established_pass)
 def test_audit_ip6tables_outbound_and_established_ipv4_pass():
-    state = test.audit_iptables_outbound_and_established(ip_version='ipv6')
+    state = test.audit_iptables_outbound_and_established_connections(ip_version='ipv6')
     assert state == 0
 
 
 @patch.object(CISAudit, "_shellexec", mock_iptables_outbound_and_established_fail)
 def test_audit_ip6tables_outbound_and_established_ipv4_fail():
-    state = test.audit_iptables_outbound_and_established(ip_version='ipv6')
+    state = test.audit_iptables_outbound_and_established_connections(ip_version='ipv6')
     assert state == 63
 
 

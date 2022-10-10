@@ -21,7 +21,7 @@ def setup_to_pass_ipv4():
     if os.path.exists('/etc/sysconfig/iptables.bak'):
         shutil.move('/etc/sysconfig/iptables.bak', '/etc/sysconfig/iptables')
     else:
-        os.remove('/etc/sysconfig/iptables.bak')
+        os.remove('/etc/sysconfig/iptables')
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def setup_to_pass_ipv6():
     if os.path.exists('/etc/sysconfig/ip6tables.bak'):
         shutil.move('/etc/sysconfig/ip6tables.bak', '/etc/sysconfig/ip6tables')
     else:
-        os.remove('/etc/sysconfig/ip6tables.bak')
+        os.remove('/etc/sysconfig/ip6tables')
 
 
 @pytest.fixture

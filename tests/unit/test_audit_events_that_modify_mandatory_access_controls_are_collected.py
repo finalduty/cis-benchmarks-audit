@@ -14,7 +14,6 @@ def mock_audit_events_that_modify_mandatory_access_controls_are_collected_pass(s
     stdout = [
         '-w /etc/selinux -p wa -k MAC-policy',
         '-w /usr/share/selinux -p wa -k MAC-policy',
-        '',
     ]
     stderr = ['']
     returncode = 0

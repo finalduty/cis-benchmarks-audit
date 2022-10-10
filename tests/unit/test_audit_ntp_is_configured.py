@@ -48,19 +48,16 @@ def mock_ntp_configured_fail(self, cmd):
     return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)
 
 
-class TestNTPIsConfigured:
-    test = CISAudit()
-    test_id = '1.1'
+@patch.object(CISAudit, "_shellexec", mock_ntp_configured_pass)
+def test_ntp_is_configured_pass():
+    state = CISAudit().audit_ntp_is_configured()
+    assert state == 0
 
-    @patch.object(CISAudit, "_shellexec", mock_ntp_configured_pass)
-    def test_ntp_is_configured_pass(self):
-        state = self.test.audit_ntp_is_configured()
-        assert state == 0
 
-    @patch.object(CISAudit, "_shellexec", mock_ntp_configured_fail)
-    def test_ntp_is_configured_fail(self):
-        state = self.test.audit_ntp_is_configured()
-        assert state == 31
+@patch.object(CISAudit, "_shellexec", mock_ntp_configured_fail)
+def test_ntp_is_configured_fail():
+    state = CISAudit().audit_ntp_is_configured()
+    assert state == 31
 
 
 if __name__ == '__main__':

@@ -24,18 +24,16 @@ def mock_nftables_table_exists_fail(self, cmd):
     return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)
 
 
-class TestNFTablesTableExists:
-    test = CISAudit()
+@patch.object(CISAudit, "_shellexec", mock_nftables_table_exists_pass)
+def test_audit_nftables_table_exists_pass():
+    state = CISAudit().audit_nftables_table_exists()
+    assert state == 0
 
-    @patch.object(CISAudit, "_shellexec", mock_nftables_table_exists_pass)
-    def test_audit_nftables_table_exists_pass(self):
-        state = self.test.audit_nftables_table_exists()
-        assert state == 0
 
-    @patch.object(CISAudit, "_shellexec", mock_nftables_table_exists_fail)
-    def test_audit_nftables_table_exists_fail(self):
-        state = self.test.audit_nftables_table_exists()
-        assert state == 1
+@patch.object(CISAudit, "_shellexec", mock_nftables_table_exists_fail)
+def test_audit_nftables_table_exists_fail():
+    state = CISAudit().audit_nftables_table_exists()
+    assert state == 1
 
 
 if __name__ == '__main__':

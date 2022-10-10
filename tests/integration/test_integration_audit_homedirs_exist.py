@@ -10,6 +10,7 @@ from tests.integration import shellexec
 def setup_to_fail():
     ## Setup
     shellexec('useradd --no-create-home pytest')
+    shellexec('rm -rf /home/pytest')
 
     yield None
 

@@ -14,7 +14,6 @@ def mock_audit_events_for_login_and_logout_are_collected_pass(self, cmd):
     stdout = [
         '-w /var/log/lastlog -p wa -k logins',
         '-w /var/run/faillock -p wa -k logins',
-        '',
     ]
 
     stderr = ['']

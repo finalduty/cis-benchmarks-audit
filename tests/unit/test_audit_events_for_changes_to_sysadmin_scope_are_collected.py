@@ -14,7 +14,6 @@ def mock_audit_events_for_changes_to_sysadmin_scope_are_collected_pass(self, cmd
     stdout = [
         '-w /etc/sudoers -p wa -k scope',
         '-w /etc/sudoers.d -p wa -k scope',
-        '',
     ]
     stderr = ['']
     returncode = 0

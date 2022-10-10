@@ -13,3 +13,5 @@ pipenv lock -r --dev > requirements.txt
 if [ -f requirements.txt ]; then 
     python3 -m pip install --user -r requirements.txt
 fi
+
+yum update -y

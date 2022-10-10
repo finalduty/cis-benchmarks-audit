@@ -13,7 +13,7 @@ test = CISAudit()
 def mock_root_is_only_uid_0_account_pass(self, cmd):
     returncode = 0
     stderr = ['']
-    stdout = ['root', '']
+    stdout = ['root']
 
     return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)
 
@@ -21,7 +21,7 @@ def mock_root_is_only_uid_0_account_pass(self, cmd):
 def mock_root_is_only_uid_0_account_fail(self, cmd):
     returncode = 0
     stderr = ['']
-    stdout = ['root', 'pytest', '']
+    stdout = ['root', 'pytest']
 
     return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)
 

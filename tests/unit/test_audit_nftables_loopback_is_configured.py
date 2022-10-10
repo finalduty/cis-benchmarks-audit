@@ -33,18 +33,16 @@ def mock_nftables_loopback_is_configured_fail(self, cmd):
     return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)
 
 
-class TestNFTablesBaseChainsExist:
-    test = CISAudit()
+@patch.object(CISAudit, "_shellexec", mock_nftables_loopback_is_configured_pass)
+def test_audit_nftables_loopback_is_configured_pass():
+    state = CISAudit().audit_nftables_loopback_is_configured()
+    assert state == 0
 
-    @patch.object(CISAudit, "_shellexec", mock_nftables_loopback_is_configured_pass)
-    def test_audit_nftables_loopback_is_configured_pass(self):
-        state = self.test.audit_nftables_loopback_is_configured()
-        assert state == 0
 
-    @patch.object(CISAudit, "_shellexec", mock_nftables_loopback_is_configured_fail)
-    def test_audit_nftables_loopback_is_configured_fail_all(self):
-        state = self.test.audit_nftables_loopback_is_configured()
-        assert state == 7
+@patch.object(CISAudit, "_shellexec", mock_nftables_loopback_is_configured_fail)
+def test_audit_nftables_loopback_is_configured_fail_all():
+    state = CISAudit().audit_nftables_loopback_is_configured()
+    assert state == 7
 
 
 if __name__ == '__main__':

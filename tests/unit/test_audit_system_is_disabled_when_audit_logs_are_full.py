@@ -9,12 +9,12 @@ from cis_audit import CISAudit
 
 
 def mock_audit_system_is_disabled_when_audit_logs_are_full_pass(self, cmd):
-    if 'space_left_action' in cmd:
-        stdout = ['space_left_action = email', '']
-    elif 'action_mail_acct' in cmd:
-        stdout = ['action_mail_acct = root', '']
-    elif 'admin_space_left_action' in cmd:
-        stdout = ['admin_space_left_action = halt', '']
+    if '^space_left_action' in cmd:
+        stdout = ['space_left_action = email']
+    elif '^action_mail_acct' in cmd:
+        stdout = ['action_mail_acct = root']
+    elif '^admin_space_left_action' in cmd:
+        stdout = ['admin_space_left_action = halt']
 
     stderr = ['']
     returncode = 0

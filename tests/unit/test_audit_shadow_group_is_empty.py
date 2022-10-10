@@ -9,7 +9,7 @@ from cis_audit import CISAudit
 
 
 def mock_shadow_group_is_empty(self, cmd):
-    output = ['', '']
+    output = ['']
     error = ['']
     returncode = 0
 
@@ -17,7 +17,7 @@ def mock_shadow_group_is_empty(self, cmd):
 
 
 def mock_shadow_group_is_not_empty(self, cmd):
-    output = ['user', '']
+    output = ['user']
     error = ['']
     returncode = 0
 
@@ -36,21 +36,21 @@ test = CISAudit()
 
 
 @patch.object(CISAudit, "_shellexec", mock_shadow_group_is_empty)
-def test_shadow_group_is_empty_pass():
+def test_audit_shadow_group_is_empty_pass():
     state = test.audit_shadow_group_is_empty()
     assert state == 0
 
 
 @patch.object(CISAudit, "_shellexec", mock_shadow_group_is_absent)
-def test_shadow_group_is_absent_pass():
+def test_audit_shadow_group_is_absent_pass():
     state = test.audit_shadow_group_is_empty()
     assert state == 0
 
 
 @patch.object(CISAudit, "_shellexec", mock_shadow_group_is_not_empty)
-def test_shadow_group_is_empty_fail():
+def test_audit_shadow_group_is_empty_fail():
     state = test.audit_shadow_group_is_empty()
-    assert state == 1
+    assert state == 3
 
 
 if __name__ == '__main__':

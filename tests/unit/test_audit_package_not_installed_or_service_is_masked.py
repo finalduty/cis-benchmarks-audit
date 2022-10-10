@@ -9,26 +9,33 @@ from cis_audit import CISAudit
 test = CISAudit()
 
 
-def mock_audit_package_not_installed_or_service_is_masked_pass(package, service):
+def mock_result_pass(package, service):
     return 0
 
 
-def mock_audit_package_not_installed_or_service_is_masked_fail(package, service):
+def mock_result_fail(package, service):
     return 1
 
 
-@patch.object(CISAudit, "audit_package_not_installed", mock_audit_package_not_installed_or_service_is_masked_pass)
-@patch.object(CISAudit, "audit_service_is_masked", mock_audit_package_not_installed_or_service_is_masked_pass)
-def test_audit_package_not_installed_or_service_is_masked_pass():
+@patch.object(CISAudit, "audit_package_is_installed", mock_result_fail)
+@patch.object(CISAudit, "audit_service_is_masked", mock_result_fail)
+def test_audit_package_not_installed_or_service_is_masked_pass_not_installed():
     state = test.audit_package_not_installed_or_service_is_masked(package='pytest', service='pytestd')
     assert state == 0
 
 
-@patch.object(CISAudit, "audit_package_not_installed", mock_audit_package_not_installed_or_service_is_masked_fail)
-@patch.object(CISAudit, "audit_service_is_masked", mock_audit_package_not_installed_or_service_is_masked_fail)
+@patch.object(CISAudit, "audit_package_is_installed", mock_result_pass)
+@patch.object(CISAudit, "audit_service_is_masked", mock_result_pass)
+def test_audit_package_not_installed_or_service_is_masked_pass_masked():
+    state = test.audit_package_not_installed_or_service_is_masked(package='pytest', service='pytestd')
+    assert state == 0
+
+
+@patch.object(CISAudit, "audit_package_is_installed", mock_result_pass)
+@patch.object(CISAudit, "audit_service_is_masked", mock_result_fail)
 def test_audit_package_not_installed_or_service_is_masked_fail():
     state = test.audit_package_not_installed_or_service_is_masked(package='pytest', service='pytestd')
-    assert state == 3
+    assert state == 1
 
 
 if __name__ == '__main__':

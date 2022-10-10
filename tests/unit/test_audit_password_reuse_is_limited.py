@@ -16,6 +16,7 @@ def mock_password_reuse_is_limited_pass(*args):
     stdout = [
         '/etc/pam.d/system-auth:password required pam_pwhistory.so remember=5',
         '/etc/pam.d/password-auth:password required pam_pwhistory.so remember=5',
+        '',
     ]
 
     return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)

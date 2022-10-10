@@ -17,7 +17,6 @@ def mock_audit_events_for_kernel_module_loading_and_unloading_are_collected_pass
             '-w /sbin/rmmod -p x -k modules',
             '-w /sbin/modprobe -p x -k modules',
             '-a always,exit -F arch=b64 -S init_module,delete_module -F key=modules',
-            '',
         ]
     else:
         stdout = [
@@ -25,7 +24,6 @@ def mock_audit_events_for_kernel_module_loading_and_unloading_are_collected_pass
             '-w /sbin/rmmod -p x -k modules',
             '-w /sbin/modprobe -p x -k modules',
             '-a always,exit -F arch=b64 -S init_module -S delete_module -k modules',
-            '',
         ]
     stderr = ['']
     returncode = 0

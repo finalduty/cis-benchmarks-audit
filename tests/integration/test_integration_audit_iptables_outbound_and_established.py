@@ -36,23 +36,23 @@ def setup_to_pass_ipv6():
 
 ## IPv4
 def test_integration_audit_iptables_outbound_and_established_pass_ipv4(setup_to_pass_ipv4):
-    state = CISAudit().audit_iptables_outbound_and_established(ip_version='ipv4')
+    state = CISAudit().audit_iptables_outbound_and_established_connections(ip_version='ipv4')
     assert state == 0
 
 
 def test_integration_audit_iptables_outbound_and_established_fail_ipv4():
-    state = CISAudit().audit_iptables_outbound_and_established(ip_version='ipv4')
+    state = CISAudit().audit_iptables_outbound_and_established_connections(ip_version='ipv4')
     assert state == 63
 
 
 ## IPv6
 def test_integration_audit_iptables_outbound_and_established_pass_ipv6(setup_to_pass_ipv6):
-    state = CISAudit().audit_iptables_outbound_and_established(ip_version='ipv6')
+    state = CISAudit().audit_iptables_outbound_and_established_connections(ip_version='ipv6')
     assert state == 0
 
 
 def test_integration_audit_iptables_outbound_and_established_fail_ipv6():
-    state = CISAudit().audit_iptables_outbound_and_established(ip_version='ipv6')
+    state = CISAudit().audit_iptables_outbound_and_established_connections(ip_version='ipv6')
     assert state == 63
 
 

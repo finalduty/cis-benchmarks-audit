@@ -24,19 +24,16 @@ def mock_unconfined_services_fail(self, cmd):
     return SimpleNamespace(returncode=returncode, stderr=stderr, stdout=stdout)
 
 
-class TestUnconfinedServices:
-    test = CISAudit()
-    test_id = '1.1'
+@patch.object(CISAudit, "_shellexec", mock_unconfined_services_pass)
+def test_no_unconfined_services_pass():
+    state = CISAudit().audit_no_unconfined_services()
+    assert state == 0
 
-    @patch.object(CISAudit, "_shellexec", mock_unconfined_services_pass)
-    def test_no_unconfined_services_pass(self):
-        state = self.test.audit_no_unconfined_services()
-        assert state == 0
 
-    @patch.object(CISAudit, "_shellexec", mock_unconfined_services_fail)
-    def test_no_unconfined_services_fail(self):
-        state = self.test.audit_no_unconfined_services()
-        assert state == 1
+@patch.object(CISAudit, "_shellexec", mock_unconfined_services_fail)
+def test_no_unconfined_services_fail():
+    state = CISAudit().audit_no_unconfined_services()
+    assert state == 1
 
 
 if __name__ == '__main__':

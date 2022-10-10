@@ -18,7 +18,6 @@ def mock_audit_events_that_modify_datetime_are_collected_pass(self, cmd):
             '-a always,exit -F arch=b64 -S clock_settime -F key=time-change',
             '-a always,exit -F arch=b32 -S clock_settime -F key=time-change',
             '-w /etc/localtime -p wa -k time-change',
-            '',
         ]
     else:
         stdout = [
@@ -27,7 +26,6 @@ def mock_audit_events_that_modify_datetime_are_collected_pass(self, cmd):
             '-a always,exit -F arch=b64 -S clock_settime -k time-change',
             '-a always,exit -F arch=b32 -S clock_settime -k time-change',
             '-w /etc/localtime -p wa -k time-change',
-            '',
         ]
     stderr = ['']
     returncode = 0
