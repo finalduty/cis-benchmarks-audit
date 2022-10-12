@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 import pytest
-from cis_audit import CISAudit
 
+from cis_audit import CISAudit
 from tests.integration import shellexec
 
 

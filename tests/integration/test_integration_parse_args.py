@@ -9,7 +9,7 @@ import cis_audit
 test = cis_audit.CISAudit()
 
 
-def test_parse_arg_debug(caplog):
+def test_integration_parse_arg_debug(caplog):
     """Test that the '--debug' argument turns on debug logging"""
     args = [path.relpath(__file__), '--debug']
     cis_audit.parse_arguments(argv=args)
@@ -17,7 +17,7 @@ def test_parse_arg_debug(caplog):
     assert caplog.records[0].msg == 'Debugging enabled'
 
 
-def test_parse_arg_log_level_debug(caplog):
+def test_integration_parse_arg_log_level_debug(caplog):
     """Test that the '--log-level DEBUG' argument turns on debug logging"""
     args = [path.relpath(__file__), '--log-level', 'DEBUG']
     cis_audit.parse_arguments(args)
@@ -25,7 +25,7 @@ def test_parse_arg_log_level_debug(caplog):
     assert caplog.records[0].msg == 'Debugging enabled'
 
 
-def test_parse_arg_level_1(caplog):
+def test_integration_parse_arg_level_1(caplog):
     """Test that the '--level 1' argument sets args.level to 1"""
     args = [path.relpath(__file__), '--debug', '--level', '1']
 
@@ -40,7 +40,7 @@ def test_parse_arg_level_1(caplog):
     assert status
 
 
-def test_parse_arg_level_2(caplog):
+def test_integration_parse_arg_level_2(caplog):
     """Test that the '--level 2' argument sets args.level to 2"""
     args = [path.relpath(__file__), '--debug', '--level', '2']
     cis_audit.parse_arguments(argv=args)
@@ -54,7 +54,7 @@ def test_parse_arg_level_2(caplog):
     assert status
 
 
-def test_parse_arg_level_default(caplog):
+def test_integration_parse_arg_level_default(caplog):
     """Test that the default level argument sets args.level to 0"""
     args = [path.relpath(__file__), '--debug']
     cis_audit.parse_arguments(argv=args)
@@ -68,7 +68,7 @@ def test_parse_arg_level_default(caplog):
     assert status
 
 
-def test_parse_arg_include(caplog):
+def test_integration_parse_arg_include(caplog):
     args = [path.relpath(__file__), '--debug', '--include', '1.1', '2.2.2']
     cis_audit.parse_arguments(argv=args)
     status = False
@@ -81,7 +81,7 @@ def test_parse_arg_include(caplog):
     assert status
 
 
-def test_parse_arg_exclude(caplog):
+def test_integration_parse_arg_exclude(caplog):
     args = [path.relpath(__file__), '--debug', '--exclude', '1.1', '2.2.2']
     cis_audit.parse_arguments(argv=args)
     status = False
@@ -94,7 +94,7 @@ def test_parse_arg_exclude(caplog):
     assert status
 
 
-def test_parse_arg_nice(caplog):
+def test_integration_parse_arg_nice(caplog):
     args = [path.relpath(__file__), '--debug', '--nice']
     cis_audit.parse_arguments(argv=args)
     status = False
@@ -107,7 +107,7 @@ def test_parse_arg_nice(caplog):
     assert status
 
 
-def test_parse_arg_no_nice(caplog):
+def test_integration_parse_arg_no_nice(caplog):
     args = [path.relpath(__file__), '--debug', '--no-nice']
     cis_audit.parse_arguments(argv=args)
     status = True
@@ -120,7 +120,7 @@ def test_parse_arg_no_nice(caplog):
     assert status
 
 
-def test_parse_arg_no_color(caplog):
+def test_integration_parse_arg_no_color(caplog):
     args = [path.relpath(__file__), '--debug', '--no-color']
     cis_audit.parse_arguments(argv=args)
     status = False
@@ -133,7 +133,7 @@ def test_parse_arg_no_color(caplog):
     assert status
 
 
-def test_parse_arg_no_colour(caplog):
+def test_integration_parse_arg_no_colour(caplog):
     args = [path.relpath(__file__), '--debug', '--no-colour']
     cis_audit.parse_arguments(argv=args)
     status = False
@@ -146,7 +146,7 @@ def test_parse_arg_no_colour(caplog):
     assert status
 
 
-def test_parse_arg_outformat_csv(caplog):
+def test_integration_parse_arg_outformat_csv(caplog):
     args = [path.relpath(__file__), '--debug', '--outformat', 'csv']
     cis_audit.parse_arguments(argv=args)
     status = False
@@ -159,7 +159,7 @@ def test_parse_arg_outformat_csv(caplog):
     assert status
 
 
-def test_parse_arg_outformat_json(caplog):
+def test_integration_parse_arg_outformat_json(caplog):
     args = [path.relpath(__file__), '--debug', '--outformat', 'json']
     cis_audit.parse_arguments(argv=args)
     status = False
@@ -172,7 +172,7 @@ def test_parse_arg_outformat_json(caplog):
     assert status
 
 
-def test_parse_arg_outformat_text(caplog):
+def test_integration_parse_arg_outformat_text(caplog):
     args = [path.relpath(__file__), '--debug', '--outformat', 'text']
     cis_audit.parse_arguments(argv=args)
     status = False
@@ -185,7 +185,7 @@ def test_parse_arg_outformat_text(caplog):
     assert status
 
 
-def test_parse_arg_csv(caplog):
+def test_integration_parse_arg_csv(caplog):
     args = [path.relpath(__file__), '--debug', '--csv']
     cis_audit.parse_arguments(argv=args)
     status = False
@@ -198,7 +198,7 @@ def test_parse_arg_csv(caplog):
     assert status
 
 
-def test_parse_arg_json(caplog):
+def test_integration_parse_arg_json(caplog):
     args = [path.relpath(__file__), '--debug', '--json']
     cis_audit.parse_arguments(argv=args)
     status = False
@@ -211,7 +211,7 @@ def test_parse_arg_json(caplog):
     assert status
 
 
-def test_parse_arg_system_type_workstation(caplog):
+def test_integration_parse_arg_system_type_workstation(caplog):
     args = [path.relpath(__file__), '--debug', '--workstation']
     cis_audit.parse_arguments(argv=args)
     status = False

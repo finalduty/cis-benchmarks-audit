@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+
 import pytest
 
 from cis_audit import CISAudit

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
 import shutil
-from cis_audit import CISAudit
 
 import pytest
+
+from cis_audit import CISAudit
 from tests.integration import shellexec
 
 

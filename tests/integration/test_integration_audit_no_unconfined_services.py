@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from time import sleep
 import pytest
 
 from cis_audit import CISAudit
@@ -10,6 +11,8 @@ from tests.integration import shellexec
 def setup_to_pass():
     ## Setup
     print(shellexec('pkill -e VBoxService'))
+    # Wait before proceeding to allow VBoxService to finish exiting
+    sleep(0.5)
 
     yield None
 

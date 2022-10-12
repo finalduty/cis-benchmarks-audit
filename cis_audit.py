@@ -60,38 +60,7 @@ class CISAudit:
     def _get_utcnow(self) -> datetime:
         return datetime.utcnow()
 
-    def _shellexec(self, command: str) -> "SimpleNamespace[str, str, int]":
-        """Execute shell command on the system. Supports piped commands
-
-        Parameters
-        ----------
-        command : string, required
-            Shell command to execute
-
-        Returns
-        -------
-        Namespace:
-
-        """
-
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        output = result.stdout.decode('UTF-8').split('\n')
-        error = result.stderr.decode('UTF-8').split('\n')
-        returncode = result.returncode
-
-        if len(output) > 1:
-            output.pop(-1)
-
-        if len(error) > 1:
-            error.pop(-1)
-
-        data = SimpleNamespace(stdout=output, stderr=error, returncode=returncode)
-
-        self.log.debug(f"'{command}', {data}")
-
-        return data
-
-    def _test_is_included(self, test_id, test_level) -> bool:
+    def _is_test_included(self, test_id, test_level) -> bool:
         """Check whether a test_id should be tested or not
 
         Parameters
@@ -179,6 +148,37 @@ class CISAudit:
             self.log.debug(f'Not including test {test_id}')
 
         return is_test_included
+
+    def _shellexec(self, command: str) -> "SimpleNamespace[str, str, int]":
+        """Execute shell command on the system. Supports piped commands
+
+        Parameters
+        ----------
+        command : string, required
+            Shell command to execute
+
+        Returns
+        -------
+        Namespace:
+
+        """
+
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        output = result.stdout.decode('UTF-8').split('\n')
+        error = result.stderr.decode('UTF-8').split('\n')
+        returncode = result.returncode
+
+        if len(output) > 1:
+            output.pop(-1)
+
+        if len(error) > 1:
+            error.pop(-1)
+
+        data = SimpleNamespace(stdout=output, stderr=error, returncode=returncode)
+
+        self.log.debug(f"'{command}', {data}")
+
+        return data
 
     def audit_access_to_su_command_is_restricted(self) -> int:
         state = 0
@@ -1692,7 +1692,7 @@ class CISAudit:
         state = 0
         removable_mountpoints = self._shellexec("lsblk -o RM,MOUNTPOINT | awk '/1/ {print $2}'").stdout
 
-        for mountpoint in removable_mountpoints:
+        for mountpoint in removable_mountpoints:  # pragma: no cover
             if mountpoint != "":
                 cmd = Rf'findmnt -n "{mountpoint}" | grep -Ev "\b{option}\b"'
                 r = self._shellexec(cmd)
@@ -2030,13 +2030,15 @@ class CISAudit:
 
         return state
 
-    def audit_xdcmp_not_enabled(self) -> int:
+    def audit_xdmcp_not_enabled(self) -> int:
         state = 0
 
-        cmd = R"awk '{RS=\"[\"} /xdmcp/ {print $0}' /etc/gdm/custom.conf | grep -Eis '^\s*Enable\s*=\s*true'"
-        r = self._shellexec(cmd)
-        if r.stdout != [""]:
-            state += 1
+        if os.path.exists('/etc/gdm/'):
+            cmd = R'''awk '{RS="["} /xdmcp/ {print $0}' /etc/gdm/custom.conf | grep -Eis '^\s*Enable\s*=\s*true' '''
+            r = self._shellexec(cmd)
+
+            if r.stdout != ['']:
+                state += 1
 
         return state
 
@@ -2191,7 +2193,7 @@ class CISAudit:
                 test_type = 'notimplemented'
 
             ## Check whether this test_id is included
-            if self._test_is_included(test_id, test_level):
+            if self._is_test_included(test_id, test_level):
                 if test_type == 'header':
                     results.append((test_id, test_description))
 
@@ -2307,8 +2309,8 @@ benchmarks = {
             {'_id': "1.8", 'description': "Gnome Display Manager", 'type': "header"},
             {'_id': "1.8.1", 'description': "Ensure GNOME Display Manager is removed", 'function': CISAudit.audit_package_not_installed, 'levels': {'server': 2, 'workstation': None}, 'kwargs': {'package': 'gdm'}},
             {'_id': "1.8.2", 'description': "Ensure GDM login banner is configured", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "1.8.3", 'description': "Ensure last logged in user display is disabled", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "1.8.4", 'description': "Ensure XDCMP is not enabled", 'function': CISAudit.audit_xdcmp_not_enabled, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "1.8.3", 'description': "Ensure last logged in user display is disabled", 'function': CISAudit.audit_gdm_last_user_logged_in_disabled, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "1.8.4", 'description': "Ensure XDCMP is not enabled", 'function': CISAudit.audit_xdmcp_not_enabled, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "1.9", 'description': 'Ensure updates, patches, and additional security software are installed', 'function': CISAudit.audit_updates_installed, 'levels': {'server': 1, 'workstation': 1}, 'type': "manual"},
             {'_id': "2", 'description': "Services", 'type': "header"},
             {'_id': "2.1", 'description': "inetd Services", 'type': "header"},

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-import pytest
 import shutil
+
+import pytest
 
 from cis_audit import CISAudit
 from tests.integration import shellexec
@@ -17,6 +18,23 @@ def setup_sshd_config():
 
     ## Tear-down
     shutil.move('/etc/ssh/sshd_config.bak', '/etc/ssh/sshd_config')
+
+
+@pytest.fixture
+def setup_to_error():
+    ## Setup
+    shutil.copy('/etc/ssh/sshd_config', '/etc/ssh/sshd_config.bak')
+    shellexec('echo foo >> /etc/ssh/sshd_config')
+
+    yield None
+
+    ## Tear-down
+    shutil.move('/etc/ssh/sshd_config.bak', '/etc/ssh/sshd_config')
+
+
+def test_integration_audit_sshd_config_option_error(setup_to_error):
+    state = CISAudit().audit_sshd_config_option(parameter='x11forwarding', expected_value='yes')
+    assert state == 1
 
 
 def test_integration_audit_sshd_config_option_pass_x11forwarding_yes():
