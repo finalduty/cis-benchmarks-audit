@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from time import sleep
+
 import pytest
 
 from cis_audit import CISAudit

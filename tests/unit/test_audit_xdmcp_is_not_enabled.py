@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
+import os
 from types import SimpleNamespace
 from unittest.mock import patch
-import os
+
 import pytest
 
 from cis_audit import CISAudit

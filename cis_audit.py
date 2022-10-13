@@ -9,7 +9,7 @@
 # You can obtain a copy of the CIS Benchmarks from https://www.cisecurity.org/cis-benchmarks/
 # Use of the CIS Benchmarks are subject to the Terms of Use for Non-Member CIS Products - https://www.cisecurity.org/terms-of-use-for-non-member-cis-products
 
-__version__ = '0.20.0'
+__version__ = '0.20.0-alpha.3'
 
 ### Imports ###
 import json  # https://docs.python.org/3/library/json.html
@@ -20,15 +20,25 @@ import re  # https://docs.python.org/3/library/re.html
 import stat  # https://docs.python.org/3/library/stat.html
 import subprocess  # https://docs.python.org/3/library/subprocess.html
 import sys  # https://docs.python.org/3/library/sys.html
-from argparse import ArgumentParser  # https://docs.python.org/3/library/argparse.html#argparse.ArgumentParser
-from argparse import RawTextHelpFormatter  # https://docs.python.org/3/library/argparse.html#argparse.RawTextHelpFormatter
-from datetime import datetime  # https://docs.python.org/3/library/datetime.html#datetime.datetime
+from argparse import (
+    ArgumentParser,  # https://docs.python.org/3/library/argparse.html#argparse.ArgumentParser
+)
+from argparse import (
+    RawTextHelpFormatter,  # https://docs.python.org/3/library/argparse.html#argparse.RawTextHelpFormatter
+)
+from datetime import (
+    datetime,  # https://docs.python.org/3/library/datetime.html#datetime.datetime
+)
 from grp import getgrgid  # https://docs.python.org/3/library/grp.html#grp.getgrgid
 from pwd import getpwuid  # https://docs.python.org/3/library/pwd.html#pwd.getpwuid
-from types import SimpleNamespace  # https://docs.python.org/3/library/types.html#types.SimpleNamespace
+from types import (
+    SimpleNamespace,  # https://docs.python.org/3/library/types.html#types.SimpleNamespace
+)
 from typing import Generator
 
-from tests.integration import shellexec  # https://docs.python.org/3/library/typing.html#typing.Generator
+from tests.integration import (
+    shellexec,  # https://docs.python.org/3/library/typing.html#typing.Generator
+)
 
 
 ### Classes ###

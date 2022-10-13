@@ -2,6 +2,7 @@
 
 import os
 import shutil
+
 import pytest
 
 from cis_audit import CISAudit

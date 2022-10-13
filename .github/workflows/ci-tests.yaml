@@ -14,10 +14,10 @@ jobs:
         python-version: ['3.6']
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3 # https://github.com/actions/cache/releases
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4 # https://github.com/actions/setup-python/releases
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -43,12 +43,11 @@ jobs:
           pytest tests/unit
           coverage xml
 
-      - name: Codecov
-        # You may pin to the exact commit or the version.
-        # uses: codecov/codecov-action@f32b3a3741e1053eb607407145bc9619351dc93b
-        uses: codecov/codecov-action@v2.1.0
-        with:
-          files: coverage.xml
+      #- name: Codecov
+      #  uses: codecov/codecov-action@v3  # https://github.com/codecov/codecov-action/releases
+      #
+      #  with:
+      #    files: coverage.xml
 
   integration-tests:
     runs-on: macos-12
@@ -59,10 +58,10 @@ jobs:
         os: ['centos7']
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3 # https://github.com/actions/cache/releases
 
       - name: Cache Vagrant boxes
-        uses: actions/cache@v3
+        uses: actions/cache@v3 # https://github.com/actions/cache/releases
         with:
           path: ~/.vagrant.d/boxes
           key: ${{ runner.os }}-vagrant-boxes-${{ hashFiles('Vagrantfile') }}
@@ -70,9 +69,9 @@ jobs:
             ${{ runner.os }}-vagrant-boxes-
 
       - name: Cache Vagrant machines
-        uses: actions/cache@v3
+        uses: actions/cache@v3 # https://github.com/actions/cache/releases
         with:
-          path: ~/.vagrant/machines
+          path: .vagrant/machines
           key: ${{ runner.os }}-vagrant-machines-${{ hashFiles('Vagrantfile') }}
           restore-keys: |
             ${{ runner.os }}-vagrant-machines-

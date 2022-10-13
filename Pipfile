@@ -13,7 +13,6 @@ isort = "*"
 mock = "*"
 pyfakefs = "<4.6.0"
 pytest-cov = "*"
-tox = "*"
 vermin = "*"
 
 [requires]

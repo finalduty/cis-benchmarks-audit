@@ -5,7 +5,6 @@ import os
 import pytest
 
 from cis_audit import CISAudit
-
 from tests.integration import shellexec
 
 
