@@ -71,7 +71,7 @@ jobs:
       - name: Cache Vagrant machines
         uses: actions/cache@v3 # https://github.com/actions/cache/releases
         with:
-          path: .vagrant/machines
+          path: ~/VirtualBox VMs
           key: ${{ runner.os }}-vagrant-machines-${{ hashFiles('Vagrantfile') }}
           restore-keys: |
             ${{ runner.os }}-vagrant-machines-
