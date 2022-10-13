@@ -14,7 +14,7 @@ jobs:
         python-version: ['3.6']
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
@@ -59,15 +59,23 @@ jobs:
         os: ['centos7']
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Cache Vagrant boxes
         uses: actions/cache@v3
         with:
           path: ~/.vagrant.d/boxes
-          key: ${{ runner.os }}-vagrant-${{ hashFiles('Vagrantfile') }}
+          key: ${{ runner.os }}-vagrant-boxes-${{ hashFiles('Vagrantfile') }}
           restore-keys: |
-            ${{ runner.os }}-vagrant-
+            ${{ runner.os }}-vagrant-boxes-
+
+      - name: Cache Vagrant machines
+        uses: actions/cache@v3
+        with:
+          path: ~/.vagrant/machines
+          key: ${{ runner.os }}-vagrant-machines-${{ hashFiles('Vagrantfile') }}
+          restore-keys: |
+            ${{ runner.os }}-vagrant-machines-
 
       - name: Show Vagrant version
         run: vagrant --version
@@ -76,4 +84,4 @@ jobs:
         run: vagrant up ${{ matrix.os }}
 
       - name: Run integration tests on ${{ matrix.os }}
-        run: vagrant ssh ${{ matrix.os }} -c "cd /vagrant && sudo /root/.local/bin/pytest --no-cov tests/integration"
+        run: vagrant ssh ${{ matrix.os }} -c 'cd /vagrant && sudo PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin /root/.local/bin/pytest tests/integration'

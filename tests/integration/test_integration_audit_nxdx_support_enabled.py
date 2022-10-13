@@ -6,24 +6,26 @@ import pytest
 
 from cis_audit import CISAudit
 
-# from tests.integration import shellexec
+from tests.integration import shellexec
 
 
 @pytest.fixture
 def setup_to_fail():
     ## Setup
-    with open('/usr/local/sbin/dmesg', 'w') as f:
+    with open('/usr/local/bin/dmesg', 'w') as f:
         f.writelines(
             {
-                '/bin/dmesg | grep -v "Execute Disable',
+                '/bin/dmesg | grep -v "Execute Disable"',
             }
         )
-    os.chmod('/usr/local/sbin/dmesg', 755)
+    os.chmod('/usr/local/bin/dmesg', 755)
+    print(shellexec('echo $PATH'))
+    print(shellexec('which dmesg'))
 
     yield None
 
     ## Tear-down
-    os.remove('/usr/local/sbin/dmesg')
+    os.remove('/usr/local/bin/dmesg')
 
 
 def test_integration_audit_nxdx_support_enabled_pass():
