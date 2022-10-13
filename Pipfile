@@ -8,16 +8,12 @@ name = "pypi"
 [dev-packages]
 cis-benchmarks-audit = {editable = true, path = "."}
 black = "*"
-bump2version = "*"
-check-python-versions = "*"
 flake8 = "*"
 isort = "*"
 mock = "*"
 pyfakefs = "<4.6.0"
 pytest-cov = "*"
-semver = "*"
 vermin = "*"
-tox = "*"
 
 [requires]
 python_version = "3.6"

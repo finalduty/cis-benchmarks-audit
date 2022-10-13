@@ -9,7 +9,7 @@
 # You can obtain a copy of the CIS Benchmarks from https://www.cisecurity.org/cis-benchmarks/
 # Use of the CIS Benchmarks are subject to the Terms of Use for Non-Member CIS Products - https://www.cisecurity.org/terms-of-use-for-non-member-cis-products
 
-__version__ = '0.20.0-alpha.2'
+__version__ = '0.20.0-alpha.3'
 
 ### Imports ###
 import json  # https://docs.python.org/3/library/json.html
@@ -20,13 +20,25 @@ import re  # https://docs.python.org/3/library/re.html
 import stat  # https://docs.python.org/3/library/stat.html
 import subprocess  # https://docs.python.org/3/library/subprocess.html
 import sys  # https://docs.python.org/3/library/sys.html
-from argparse import ArgumentParser  # https://docs.python.org/3/library/argparse.html#argparse.ArgumentParser
-from argparse import RawTextHelpFormatter  # https://docs.python.org/3/library/argparse.html#argparse.RawTextHelpFormatter
-from datetime import datetime  # https://docs.python.org/3/library/datetime.html#datetime.datetime
+from argparse import (
+    ArgumentParser,  # https://docs.python.org/3/library/argparse.html#argparse.ArgumentParser
+)
+from argparse import (
+    RawTextHelpFormatter,  # https://docs.python.org/3/library/argparse.html#argparse.RawTextHelpFormatter
+)
+from datetime import (
+    datetime,  # https://docs.python.org/3/library/datetime.html#datetime.datetime
+)
 from grp import getgrgid  # https://docs.python.org/3/library/grp.html#grp.getgrgid
 from pwd import getpwuid  # https://docs.python.org/3/library/pwd.html#pwd.getpwuid
-from types import SimpleNamespace  # https://docs.python.org/3/library/types.html#types.SimpleNamespace
-from typing import Generator  # https://docs.python.org/3/library/typing.html#typing.Generator
+from types import (
+    SimpleNamespace,  # https://docs.python.org/3/library/types.html#types.SimpleNamespace
+)
+from typing import Generator
+
+from tests.integration import (
+    shellexec,  # https://docs.python.org/3/library/typing.html#typing.Generator
+)
 
 
 ### Classes ###
@@ -58,28 +70,7 @@ class CISAudit:
     def _get_utcnow(self) -> datetime:
         return datetime.utcnow()
 
-    def _shellexec(self, command: str) -> "SimpleNamespace[str, str, int]":
-        """Execute shell command on the system. Supports piped commands
-
-        Parameters
-        ----------
-        command : string, required
-            Shell command to execute
-
-        Returns
-        -------
-        Namespace:
-
-        """
-
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        output = result.stdout.decode('UTF-8').split('\n')
-        error = result.stderr.decode('UTF-8').split('\n')
-        returncode = result.returncode
-
-        return SimpleNamespace(stdout=output, stderr=error, returncode=returncode)
-
-    def _test_is_included(self, test_id, test_level) -> bool:
+    def _is_test_included(self, test_id, test_level) -> bool:
         """Check whether a test_id should be tested or not
 
         Parameters
@@ -168,6 +159,37 @@ class CISAudit:
 
         return is_test_included
 
+    def _shellexec(self, command: str) -> "SimpleNamespace[str, str, int]":
+        """Execute shell command on the system. Supports piped commands
+
+        Parameters
+        ----------
+        command : string, required
+            Shell command to execute
+
+        Returns
+        -------
+        Namespace:
+
+        """
+
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        output = result.stdout.decode('UTF-8').split('\n')
+        error = result.stderr.decode('UTF-8').split('\n')
+        returncode = result.returncode
+
+        if len(output) > 1:
+            output.pop(-1)
+
+        if len(error) > 1:
+            error.pop(-1)
+
+        data = SimpleNamespace(stdout=output, stderr=error, returncode=returncode)
+
+        self.log.debug(f"'{command}', {data}")
+
+        return data
+
     def audit_access_to_su_command_is_restricted(self) -> int:
         state = 0
         cmd = R"grep -Pi '^\h*auth\h+(?:required|requisite)\h+pam_wheel\.so\h+(?:[^#\n\r]+\h+)?((?!\2)(use_uid\b|group=\H+\b))\h+(?:[^#\n\r]+\h+)?((?!\1)(use_uid\b|group=\H+\b))(\h+.*)?$' /etc/pam.d/su"
@@ -179,7 +201,7 @@ class CISAudit:
         else:
             for entry in r.stdout[0].split():
                 if entry.startswith('group='):
-                    group = entry.split('=')
+                    group = entry.split('=')[1]
                     break
 
             cmd = f'grep {group} /etc/group'
@@ -203,7 +225,7 @@ class CISAudit:
         return state
 
     def audit_audit_config_is_immutable(self) -> int:
-        cmd = R'grep "^\s*[^#]" /etc/audit/rules.d/*.rules | tail -1'
+        cmd = R'grep -h "^\s*[^#]" /etc/audit/rules.d/*.rules | tail -1'
         r = self._shellexec(cmd)
 
         if r.stdout[0] == '-e 2':
@@ -214,7 +236,7 @@ class CISAudit:
         return state
 
     def audit_audit_log_size_is_configured(self) -> int:
-        cmd = R"grep '^max_log_file\s*=\s*[0-9]+' /etc/audit/auditd.conf"
+        cmd = R"grep -P '^max_log_file\s*=\s*[0-9]+' /etc/audit/auditd.conf"
         r = self._shellexec(cmd)
 
         if r.returncode == 0:
@@ -225,7 +247,7 @@ class CISAudit:
         return state
 
     def audit_audit_logs_not_automatically_deleted(self) -> int:
-        cmd = R"grep '^max_log_file\s*=\s*keep_logs' /etc/audit/auditd.conf"
+        cmd = R"grep '^max_log_file_action\s*=\s*keep_logs' /etc/audit/auditd.conf"
         r = self._shellexec(cmd)
 
         if r.returncode == 0:
@@ -276,12 +298,12 @@ class CISAudit:
             'ExecStart=-/bin/sh -c "/usr/sbin/sulogin; /usr/bin/systemctl --job-mode=fail --no-block default"',
         ]
 
-        cmd = R"grep /sbin/nologin /usr/lib/systemd/system/rescue.service"
+        cmd = R"grep ExecStart= /usr/lib/systemd/system/rescue.service"
         r = self._shellexec(cmd)
         if r.stdout[0] not in success_strings:
             state += 1
 
-        cmd = R"grep /sbin/nologin /usr/lib/systemd/system/rescue.service"
+        cmd = R"grep ExecStart= /usr/lib/systemd/system/rescue.service"
         r = self._shellexec(cmd)
         if r.stdout[0] not in success_strings:
             state += 2
@@ -327,9 +349,9 @@ class CISAudit:
     def audit_core_dumps_restricted(self) -> int:
         state = 0
 
-        cmd = R'grep -E "^\s*\*\s+hard\s+core" /etc/security/limits.conf /etc/security/limits.d/*'
+        cmd = R'grep -hE "^\s*\*\s+hard\s+core" /etc/security/limits.conf /etc/security/limits.d/*'
         r = self._shellexec(cmd)
-        if r.stdout[0] != "* hard core 0":
+        if not re.match(r'\s*\*\s+hard\s+core\s+0', r.stdout[0]):
             state += 1
 
         cmd = R"sysctl fs.suid_dumpable"
@@ -337,7 +359,7 @@ class CISAudit:
         if r.stdout[0] != "fs.suid_dumpable = 0":
             state += 2
 
-        cmd = R'grep "fs\.suid_dumpable" /etc/sysctl.conf /etc/sysctl.d/*'
+        cmd = R'grep -h "fs\.suid_dumpable" /etc/sysctl.conf /etc/sysctl.d/*'
         r = self._shellexec(cmd)
         if r.stdout[0] != "fs.suid_dumpable = 0":
             state += 4
@@ -350,8 +372,11 @@ class CISAudit:
         if os.path.exists('/etc/cron.deny'):
             state += 1
 
-        if self.audit_file_permissions(file="/etc/cron.allow", expected_user="root", expected_group="root", expected_mode="0600") != 0:
+        if not os.path.exists('/etc/cron.allow'):
             state += 2
+        else:
+            if self.audit_file_permissions(file="/etc/cron.allow", expected_user="root", expected_group="root", expected_mode="0600") != 0:
+                state += 4
 
         return state
 
@@ -453,13 +478,12 @@ class CISAudit:
 
     def audit_events_for_changes_to_sysadmin_scope_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k scope' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k scope'"
+        cmd1 = R"grep -h scope /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep scope"
 
         expected_output = [
             '-w /etc/sudoers -p wa -k scope',
             '-w /etc/sudoers.d -p wa -k scope',
-            '',
         ]
 
         r1 = self._shellexec(cmd1)
@@ -475,85 +499,102 @@ class CISAudit:
 
     def audit_events_for_discretionary_access_control_changes_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k perm_mod' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k perm_mod'"
+        cmd1 = R"grep -h perm_mod /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep perm_mod"
 
-        expected_output = [
+        expected_file_output = [
             '-a always,exit -F arch=b64 -S chmod -S fchmod -S fchmodat -F auid>=1000 -F auid!=4294967295 -k perm_mod',
             '-a always,exit -F arch=b32 -S chmod -S fchmod -S fchmodat -F auid>=1000 -F auid!=4294967295 -k perm_mod',
             '-a always,exit -F arch=b64 -S chown -S fchown -S fchownat -S lchown -F auid>=1000 -F auid!=4294967295 -k perm_mod',
             '-a always,exit -F arch=b32 -S chown -S fchown -S fchownat -S lchown -F auid>=1000 -F auid!=4294967295 -k perm_mod',
             '-a always,exit -F arch=b64 -S setxattr -S lsetxattr -S fsetxattr -S removexattr -S lremovexattr -S fremovexattr -F auid>=1000 -F auid!=4294967295 -k perm_mod',
             '-a always,exit -F arch=b32 -S setxattr -S lsetxattr -S fsetxattr -S removexattr -S lremovexattr -S fremovexattr -F auid>=1000 -F auid!=4294967295 -k perm_mod',
-            '',
+        ]
+
+        expected_auditctl_output = [
+            '-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=-1 -F key=perm_mod',
+            '-a always,exit -F arch=b32 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=-1 -F key=perm_mod',
+            '-a always,exit -F arch=b64 -S chown,fchown,lchown,fchownat -F auid>=1000 -F auid!=-1 -F key=perm_mod',
+            '-a always,exit -F arch=b32 -S lchown,fchown,chown,fchownat -F auid>=1000 -F auid!=-1 -F key=perm_mod',
+            '-a always,exit -F arch=b64 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=-1 -F key=perm_mod',
+            '-a always,exit -F arch=b32 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=-1 -F key=perm_mod',
         ]
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_for_file_deletion_by_users_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k scope' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k scope'"
+        cmd1 = R"grep -h delete /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep delete"
 
-        expected_output = [
+        expected_file_output = [
             '-a always,exit -F arch=b64 -S unlink -S unlinkat -S rename -S renameat -F auid>=1000 -F auid!=4294967295 -k delete',
             '-a always,exit -F arch=b32 -S unlink -S unlinkat -S rename -S renameat -F auid>=1000 -F auid!=4294967295 -k delete',
-            '',
+        ]
+
+        expected_auditctl_output = [
+            '-a always,exit -F arch=b64 -S rename,unlink,unlinkat,renameat -F auid>=1000 -F auid!=-1 -F key=delete',
+            '-a always,exit -F arch=b32 -S unlink,rename,unlinkat,renameat -F auid>=1000 -F auid!=-1 -F key=delete',
         ]
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_for_kernel_module_loading_and_unloading_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k actions' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k actions'"
+        cmd1 = R"grep -h modules /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep modules"
 
-        expected_output = [
+        expected_file_output = [
             '-w /sbin/insmod -p x -k modules',
             '-w /sbin/rmmod -p x -k modules',
             '-w /sbin/modprobe -p x -k modules',
             '-a always,exit -F arch=b64 -S init_module -S delete_module -k modules',
-            '',
+        ]
+
+        expected_auditctl_output = [
+            '-w /sbin/insmod -p x -k modules',
+            '-w /sbin/rmmod -p x -k modules',
+            '-w /sbin/modprobe -p x -k modules',
+            '-a always,exit -F arch=b64 -S init_module,delete_module -F key=modules',
         ]
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_for_login_and_logout_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k logins' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k logins'"
+        cmd1 = R"grep -h logins /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep logins"
 
         expected_output = [
             '-w /var/log/lastlog -p wa -k logins',
-            '-w /var/run/faillock/ -p wa -k logins',
-            '',
+            '-w /var/run/faillock -p wa -k logins',
         ]
 
         r1 = self._shellexec(cmd1)
@@ -569,14 +610,13 @@ class CISAudit:
 
     def audit_events_for_session_initiation_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k [buw]tmp' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k logins'"
+        cmd1 = R"grep -h '[buw]tmp' /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep '[buw]tmp'"
 
         expected_output = [
             '-w /var/run/utmp -p wa -k session',
             '-w /var/log/wtmp -p wa -k logins',
             '-w /var/log/btmp -p wa -k logins',
-            '',
         ]
 
         r1 = self._shellexec(cmd1)
@@ -592,106 +632,124 @@ class CISAudit:
 
     def audit_events_for_successful_file_system_mounts_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k mounts' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k mounts'"
+        cmd1 = R"grep -h mounts /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep mounts"
 
-        expected_output = [
+        expected_file_output = [
             '-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=4294967295 -k mounts',
             '-a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=4294967295 -k mounts',
-            '',
+        ]
+
+        expected_auditctl_output = [
+            '-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=-1 -F key=mounts',
+            '-a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=-1 -F key=mounts',
         ]
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_for_system_administrator_commands_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k actions' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k actions'"
+        cmd1 = R"grep -h actions /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep actions"
 
-        expected_output = [
-            '-a exit,always -F arch=b64 -C euid!=uid -F euid=0 -Fauid>=1000 -F auid!=4294967295 -S execve -k actions',
-            '-a exit,always -F arch=b32 -C euid!=uid -F euid=0 -Fauid>=1000 -F auid!=4294967295 -S execve -k actions',
-            '',
+        expected_file_output = [
+            '-a exit,always -F arch=b64 -C euid!=uid -F euid=0 -F auid>=1000 -F auid!=4294967295 -S execve -k actions',
+            '-a exit,always -F arch=b32 -C euid!=uid -F euid=0 -F auid>=1000 -F auid!=4294967295 -S execve -k actions',
+        ]
+        expected_auditctl_output = [
+            '-a always,exit -F arch=b64 -S execve -C uid!=euid -F euid=0 -F auid>=1000 -F auid!=-1 -F key=actions',
+            '-a always,exit -F arch=b32 -S execve -C uid!=euid -F euid=0 -F auid>=1000 -F auid!=-1 -F key=actions',
         ]
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_for_unsuccessful_file_access_attempts_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k mounts' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k mounts'"
+        cmd1 = R"grep -h access /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep access"
 
-        expected_output = [
+        expected_file_output = [
             '-a always,exit -F arch=b64 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k access',
             '-a always,exit -F arch=b32 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k access',
             '-a always,exit -F arch=b64 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k access',
             '-a always,exit -F arch=b32 -S creat -S open -S openat -S truncate -S ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k access',
-            '',
+        ]
+        expected_auditctl_output = [
+            '-a always,exit -F arch=b64 -S open,truncate,ftruncate,creat,openat -F exit=-EACCES -F auid>=1000 -F auid!=-1 -F key=access',
+            '-a always,exit -F arch=b32 -S open,creat,truncate,ftruncate,openat -F exit=-EACCES -F auid>=1000 -F auid!=-1 -F key=access',
+            '-a always,exit -F arch=b64 -S open,truncate,ftruncate,creat,openat -F exit=-EPERM -F auid>=1000 -F auid!=-1 -F key=access',
+            '-a always,exit -F arch=b32 -S open,creat,truncate,ftruncate,openat -F exit=-EPERM -F auid>=1000 -F auid!=-1 -F key=access',
         ]
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_that_modify_datetime_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k time-change' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k time-change'"
+        cmd1 = R"grep -h time-change /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep time-change"
 
-        expected_output = [
+        expected_file_output = [
             '-a always,exit -F arch=b64 -S adjtimex -S settimeofday -k time-change',
-            '-a always,exit -F arch=b32 -S adjtimex -S settimeofday -S stime -k time- change',
+            '-a always,exit -F arch=b32 -S adjtimex -S settimeofday -S stime -k time-change',
             '-a always,exit -F arch=b64 -S clock_settime -k time-change',
             '-a always,exit -F arch=b32 -S clock_settime -k time-change',
             '-w /etc/localtime -p wa -k time-change',
-            '',
+        ]
+
+        expected_auditctl_output = [
+            '-a always,exit -F arch=b64 -S adjtimex,settimeofday -F key=time-change',
+            '-a always,exit -F arch=b32 -S stime,settimeofday,adjtimex -F key=time-change',
+            '-a always,exit -F arch=b64 -S clock_settime -F key=time-change',
+            '-a always,exit -F arch=b32 -S clock_settime -F key=time-change',
+            '-w /etc/localtime -p wa -k time-change',
         ]
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_that_modify_mandatory_access_controls_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k MAC-policy' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k MAC-policy'"
+        cmd1 = R"grep -h MAC-policy /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep MAC-policy"
 
         expected_output = [
-            '-w /etc/selinux/ -p wa -k MAC-policy',
-            '-w /usr/share/selinux/ -p wa -k MAC-policy',
-            '',
+            '-w /etc/selinux -p wa -k MAC-policy',
+            '-w /usr/share/selinux -p wa -k MAC-policy',
         ]
 
         r1 = self._shellexec(cmd1)
@@ -707,51 +765,66 @@ class CISAudit:
 
     def audit_events_that_modify_network_environment_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k system-locale' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k system-locale'"
+        cmd1 = R"grep -h system-locale /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep system-locale"
 
-        expected_output = [
+        expected_file_output = [
             '-a always,exit -F arch=b64 -S sethostname -S setdomainname -k system-locale',
             '-a always,exit -F arch=b32 -S sethostname -S setdomainname -k system-locale',
             '-w /etc/issue -p wa -k system-locale',
             '-w /etc/issue.net -p wa -k system-locale',
             '-w /etc/hosts -p wa -k system-locale',
             '-w /etc/sysconfig/network -p wa -k system-locale',
-            '',
+        ]
+
+        expected_auditctl_output = [
+            '-a always,exit -F arch=b64 -S sethostname,setdomainname -F key=system-locale',
+            '-a always,exit -F arch=b32 -S sethostname,setdomainname -F key=system-locale',
+            '-w /etc/issue -p wa -k system-locale',
+            '-w /etc/issue.net -p wa -k system-locale',
+            '-w /etc/hosts -p wa -k system-locale',
+            '-w /etc/sysconfig/network -p wa -k system-locale',
         ]
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
 
     def audit_events_that_modify_usergroup_info_are_collected(self) -> int:
         state = 0
-        cmd1 = R"grep -- '-k identity' /etc/audit/rules.d/*.rules"
-        cmd2 = R"auditctl -l | grep -- '-k identity'"
+        cmd1 = R"grep -h identity /etc/audit/rules.d/*.rules"
+        cmd2 = R"auditctl -l | grep identity"
 
-        expected_output = [
+        expected_file_output = [
             '-w /etc/group -p wa -k identity',
             '-w /etc/passwd -p wa -k identity',
             '-w /etc/gshadow -p wa -k identity',
             '-w /etc/shadow -p wa -k identity',
             '-w /etc/security/opasswd -p wa -k identity',
-            '',
+        ]
+
+        expected_auditctl_output = [
+            '-w /etc/group -p wa -k identity',
+            '-w /etc/passwd -p wa -k identity',
+            '-w /etc/gshadow -p wa -k identity',
+            '-w /etc/shadow -p wa -k identity',
+            '-w /etc/security/opasswd -p wa -k identity',
         ]
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout != expected_output:
+        if r1.stdout != expected_file_output:
             state += 1
 
-        if r2.stdout != expected_output:
+        if r2.stdout != expected_auditctl_output:
             state += 2
 
         return state
@@ -859,7 +932,7 @@ class CISAudit:
     def audit_filesystem_integrity_regularly_checked(self) -> int:
         state = 1
 
-        cmd = R'grep -r aide /etc/cron.* /etc/crontab /var/spool/cron/root /etc/anacrontab'
+        cmd = R"grep -Ers '^([^#]+\s+)?(\/usr\/s?bin\/|^\s*)aide(\.wrapper)?\s(--?\S+\s)*(--(check|update)|\$AIDEARGS)\b' /etc/cron.* /etc/crontab /var/spool/cron/root /etc/anacrontab"
         r = self._shellexec(cmd)
 
         if r.stdout[0] != '':
@@ -915,7 +988,7 @@ class CISAudit:
                 state += 1
 
             ## Test contents of /etc/dconf/db/gdm.d/01-banner-message, if it exists
-            file = "/etc/dconf/db/gdm.d/01-banner-message"
+            file = "/etc/dconf/db/gdm.d/00-login-screen"
             if os.path.exists(file):
                 with open(file) as f:
                     contents = f.read()
@@ -952,7 +1025,7 @@ class CISAudit:
             if os.path.exists(file):
                 with open(file) as f:
                     contents = f.read()
-                    if "[org/gnome/login-screen\nbanner-message-enable=true\nbanner-message-text=" not in contents:
+                    if "[org/gnome/login-screen]\nbanner-message-enable=true\nbanner-message-text=" not in contents:
                         state += 32
             else:
                 state += 16
@@ -969,7 +1042,8 @@ class CISAudit:
         if r.stdout[0] != 'gpgcheck=1':
             state += 1
 
-        cmd = R"awk -v 'RS=[' -F '\n' '/\n\s*name\s*=\s*.*$/ && ! /\n\s*enabled\s*=\s*0(\W.*)?$/ && ! /\n\s*gpgcheck\s*=\s*1(\W.*)?$/ { t=substr($1, 1, index($1, \"]\")-1); print t, \"does not have gpgcheck enabled.\" }' /etc/yum.repos.d/*.repo"
+        cmd = R"grep -P '^\h*gpgcheck=[^1\n\r]+\b(\h+.*)?$' /etc/yum.repos.d/*.repo"
+        # cmd = R"awk -v 'RS=[' -F '\n' '/\n\s*name\s*=\s*.*$/ && ! /\n\s*enabled\s*=\s*0(\W.*)?$/ && ! /\n\s*gpgcheck\s*=\s*1(\W.*)?$/ { t=substr($1, 1, index($1, \"]\")-1); print t, \"does not have gpgcheck enabled.\" }' /etc/yum.repos.d/*.repo"
         r = self._shellexec(cmd)
 
         if r.stdout[0] != '':
@@ -979,9 +1053,7 @@ class CISAudit:
 
     def audit_homedirs_exist(self) -> int:
         state = 0
-        # homedirs = self._shellexec(R"awk -F: '{print $6}' /etc/passwd").stdout
 
-        # for dir in homedirs:
         for user, uid, homedir in self._get_homedirs():
             if homedir != '':
                 if not os.path.isdir(homedir):
@@ -1042,22 +1114,14 @@ class CISAudit:
     def audit_iptables_is_flushed(self) -> int:
         state = 0
 
-        cmd = R"iptables -S"
+        cmd = R"iptables -S | grep -v -- -P"
         r = self._shellexec(cmd)
-        if r.stdout != [
-            "-P INPUT ACCEPT",
-            "-P FORWARD ACCEPT",
-            "-P OUTPUT ACCEPT",
-        ]:
+        if r.stdout != ['']:
             state += 1
 
-        cmd = R"ip6tables -S"
+        cmd = R"ip6tables -S | grep -v -- -P"
         r = self._shellexec(cmd)
-        if r.stdout != [
-            "-P INPUT ACCEPT",
-            "-P FORWARD ACCEPT",
-            "-P OUTPUT ACCEPT",
-        ]:
+        if r.stdout != ['']:
             state += 2
 
         return state
@@ -1075,26 +1139,25 @@ class CISAudit:
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        regex = re.compile('^-P INPUT (ACCEPT|REJECT|DROP)$')
-        if regex.match(r1.stdout[0]) is None:
-            state += 1
+        self.log.debug(r1)
+        self.log.debug(r2)
 
         if len(r1.stdout) < 2 or r1.stdout[1] != '-A INPUT -i lo -j ACCEPT':
-            state += 2
+            state += 1
 
-        if len(r1.stdout) < 3 or r1.stdout[2] != '-A INPUT -s 127.0.0.0/8 -j DROP':
-            state += 4
-
-        regex = re.compile('^-P OUTPUT (ACCEPT|REJECT|DROP)$')
-        if regex.match(r2.stdout[0]) is None:
-            state += 8
+        if ip_version == 'ipv4':
+            if len(r1.stdout) < 3 or r1.stdout[2] != '-A INPUT -s 127.0.0.0/8 -j DROP':
+                state += 2
+        elif ip_version == 'ipv6':
+            if len(r1.stdout) < 3 or r1.stdout[2] != '-A INPUT -s ::1/128 -j DROP':
+                state += 2
 
         if len(r2.stdout) < 2 or r2.stdout[1] != '-A OUTPUT -o lo -j ACCEPT':
-            state += 16
+            state += 4
 
         return state
 
-    def audit_iptables_outbound_and_established(self, ip_version: str) -> int:
+    def audit_iptables_outbound_and_established_connections(self, ip_version: str) -> int:
         state = 0
 
         if ip_version == 'ipv4':
@@ -1103,6 +1166,8 @@ class CISAudit:
             cmd = R"ip6tables -S"
 
         r = self._shellexec(cmd)
+
+        self.log.debug(r)
 
         if '-A INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT' not in r.stdout:
             state += 1
@@ -1126,12 +1191,22 @@ class CISAudit:
 
     def audit_iptables_rules_are_saved(self, ip_version: str) -> int:
         if ip_version == 'ipv4':
-            cmd = R"diff -qs -y <(iptables-save | grep -v '^#' | sed 's/\[[0-9]*:[0-9]*\]//' | sort) <(grep -v '^#' /etc/sysconfig/iptables | sed 's/\[[0-9]*:[0-9]*\]//' | sort)"
+            # cmd = R"diff -qs -y <(iptables-save | grep -v '^#' | sed 's/\[[0-9]*:[0-9]*\]//' | sort) <(grep -v '^#' /etc/sysconfig/iptables | sed 's/\[[0-9]*:[0-9]*\]//' | sort)"
+            cmd1 = R"iptables-save | grep -v '^#' | sed 's/\[[0-9]*:[0-9]*\]//' | sort"
+            cmd2 = R"grep -v '^#' /etc/sysconfig/iptables | sed 's/\[[0-9]*:[0-9]*\]//' | sort"
         elif ip_version == 'ipv6':
-            cmd = R"diff -qs -y <(ip6tables-save | grep -v '^#' | sed 's/\[[0-9]*:[0-9]*\]//' | sort) <(grep -v '^#' /etc/sysconfig/ip6tables | sed 's/\[[0-9]*:[0-9]*\]//' | sort)"
-        r = self._shellexec(cmd)
+            # cmd = R"diff -qs -y <(ip6tables-save | grep -v '^#' | sed 's/\[[0-9]*:[0-9]*\]//' | sort) <(grep -v '^#' /etc/sysconfig/ip6tables | sed 's/\[[0-9]*:[0-9]*\]//' | sort)"
+            cmd1 = R"ip6tables-save | grep -v '^#' | sed 's/\[[0-9]*:[0-9]*\]//' | sort"
+            cmd2 = R"grep -v '^#' /etc/sysconfig/ip6tables | sed 's/\[[0-9]*:[0-9]*\]//' | sort"
 
-        if r.returncode == 0 and r.stdout[0] == 'Files /dev/fd/63 and /dev/fd/62 are identical':
+        # r = self._shellexec(cmd)
+        r1 = self._shellexec(cmd1)
+        r2 = self._shellexec(cmd2)
+
+        self.log.debug(r1)
+        self.log.debug(r2)
+
+        if r1.returncode == 0 and r2.returncode == 0 and r1.stdout == r2.stdout:
             state = 0
         else:
             state = 1
@@ -1139,7 +1214,7 @@ class CISAudit:
         return state
 
     def audit_journald_configured_to_compress_large_logs(self) -> int:
-        cmd = R'grep -E ^\s*Compress /etc/systemd/journald.conf'
+        cmd = R'grep -E ^\s*Compress= /etc/systemd/journald.conf'
         r = self._shellexec(cmd)
 
         if r.stdout[0] == 'Compress=yes':
@@ -1150,7 +1225,7 @@ class CISAudit:
         return state
 
     def audit_journald_configured_to_send_logs_to_rsyslog(self) -> int:
-        cmd = R'grep -E ^\s*ForwardToSyslog /etc/systemd/journald.conf'
+        cmd = R'grep -E ^\s*ForwardToSyslog= /etc/systemd/journald.conf'
         r = self._shellexec(cmd)
 
         if r.stdout[0] == 'ForwardToSyslog=yes':
@@ -1161,7 +1236,7 @@ class CISAudit:
         return state
 
     def audit_journald_configured_to_write_logfiles_to_disk(self) -> int:
-        cmd = R'grep -E ^\s*Compress /etc/systemd/journald.conf'
+        cmd = R'grep -E ^\s*Storage= /etc/systemd/journald.conf'
         r = self._shellexec(cmd)
 
         if r.stdout[0] == 'Storage=persistent':
@@ -1173,21 +1248,21 @@ class CISAudit:
 
     def audit_kernel_module_is_disabled(self, module: str) -> int:
         state = 0
-        cmd = f'modprobe -n -v {module} | grep -E "({module}|install)"'
-        r = self._shellexec(cmd)
+        cmd1 = f'modprobe -n -v {module}'
+        cmd2 = f'lsmod | grep {module}'
 
-        if r.stdout[0] == 'install /bin/true ':
+        r1 = self._shellexec(cmd1)
+        r2 = self._shellexec(cmd2)
+
+        if r1.stdout[0] == 'install /bin/true ':
             pass
-        elif r.stderr[0] == f'modprobe: FATAL: Module {module} not found.\n':
+        elif r1.stderr[0] == f'modprobe: FATAL: Module {module} not found.':
             pass
         else:
             state = 1
 
-        cmd = R'lsmod'
-        r = self._shellexec(cmd)
-
-        if module in r.stdout[0]:
-            state = 1
+        if module in r2.stdout[0]:
+            state = 2
 
         return state
 
@@ -1223,14 +1298,20 @@ class CISAudit:
 
         return state
 
-    def audit_nftables_connections_are_configured(self) -> int:
+    def audit_nftables_outbound_and_established_connections(self) -> int:
         state = 0
 
         cmd1 = 'nft list ruleset | grep "hook input"'
         cmd2 = 'nft list ruleset | grep "hook output"'
 
+        cmd1 = R"nft list ruleset | awk '/hook input/,/}/' | grep -E 'ip protocol (tcp|udp|icmp) ct state' | sed 's/^\s*//'"
+        cmd2 = R"nft list ruleset | awk '/hook output/,/}/' | grep -E 'ip protocol (tcp|udp|icmp) ct state' | sed 's/^\s*//'"
+
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
+
+        self.log.debug(f"'{cmd1}', '{r1}'")
+        self.log.debug(f"'{cmd2}', '{r2}'")
 
         if r1.stdout != [
             'ip protocol tcp ct state established accept',
@@ -1251,13 +1332,17 @@ class CISAudit:
     def audit_nftables_default_deny_policy(self) -> int:
         state = 0
 
-        cmd1 = 'nft list ruleset | grep "hook input"'
-        cmd2 = 'nft list ruleset | grep "hook forward"'
-        cmd3 = 'nft list ruleset | grep "hook output"'
+        cmd1 = R"nft list ruleset | grep 'hook input' | sed 's/^\s*//'"
+        cmd2 = R"nft list ruleset | grep 'hook forward' | sed 's/^\s*//'"
+        cmd3 = R"nft list ruleset | grep 'hook output' | sed 's/^\s*//'"
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
         r3 = self._shellexec(cmd3)
+
+        self.log.debug(f"'{cmd1}', '{r1}'")
+        self.log.debug(f"'{cmd2}', '{r2}'")
+        self.log.debug(f"'{cmd3}', '{r3}'")
 
         if r1.stdout[0] != 'type filter hook input priority 0; policy drop;':
             state += 1
@@ -1273,13 +1358,17 @@ class CISAudit:
     def audit_nftables_loopback_is_configured(self) -> int:
         state = 0
 
-        cmd1 = "nft list ruleset | awk '/hook input/,/}/' | grep 'iif \"lo\" accept'"
-        cmd2 = "nft list ruleset | awk '/hook input/,/}/' | grep 'ip saddr'"
-        cmd3 = "nft list ruleset | awk '/hook input/,/}/' | grep 'ip6 saddr'"
+        cmd1 = R"nft list ruleset | awk '/hook input/,/}/' | grep 'iif \"lo\" accept' | sed 's/^\s*//'"
+        cmd2 = R"nft list ruleset | awk '/hook input/,/}/' | grep 'ip saddr 127.0.0.0/8' | sed 's/^\s*//'"
+        cmd3 = R"nft list ruleset | awk '/hook input/,/}/' | grep 'ip6 saddr ::1' | sed 's/^\s*//'"
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
         r3 = self._shellexec(cmd3)
+
+        self.log.debug(f"'{cmd1}', '{r1}'")
+        self.log.debug(f"'{cmd2}', '{r2}'")
+        self.log.debug(f"'{cmd3}', '{r3}'")
 
         if r1.stdout[0] != 'iif "lo" accept':
             state += 1
@@ -1311,6 +1400,7 @@ class CISAudit:
 
         cmd = R"ps -eZ | grep unconfined_service_t"
         r = self._shellexec(cmd)
+
         if r.stdout[0] != "":
             state += 1
 
@@ -1334,19 +1424,20 @@ class CISAudit:
         if r.stdout[0] == "":
             state += 4
 
-        cmd = R'grep "^restrict" /etc/ntp.conf'
+        cmd = R'grep "^restrict.*default" /etc/ntp.conf'
         r = self._shellexec(cmd)
-        options = ["default", "kod", "nomodify", "notrap", "nopeer", "noquery"]
+        options = ["kod", "nomodify", "notrap", "nopeer", "noquery"]
         for option in options:
             for line in r.stdout:
                 if option not in line:
                     state += 8
+                    self.log.debug(f'Option "{option}" not in line "{line}"')
                     break
             else:
                 continue
             break
 
-        cmd = R"ps aux | grep ntp | grep -v grep"
+        cmd = R"ps aux | grep ntpd | grep -v grep"
         r = self._shellexec(cmd)
         if "-u ntp:ntp" not in r.stdout[0]:
             state += 16
@@ -1357,22 +1448,22 @@ class CISAudit:
         state = 0
         cmd = R'dmesg | grep "protection: active"'
         r = self._shellexec(cmd)
+
         if "protection: active" not in r.stdout[0]:
             state += 1
 
         return state
 
     def audit_only_one_package_is_installed(self, packages: str) -> int:
-        ### Similar to audit_package_is_installed but requires one of many packages is installed
+        ### Similar to audit_package_is_installed but requires one of many (xor) package is installed
         cmd = f'rpm -q {packages} | grep -v "not installed"'
         r = self._shellexec(cmd)
 
-        ## The length of stdout should be two because a newline is output as well.
         ## e.g. print(r.stdout) will show:
-        ##      ['chrony-3.4-1.el7.x86_64', '']
-        ##      ['chrony-3.4-1.el7.x86_64', 'ntp-4.2.6p5-29.el7.centos.2.x86_64', '']
+        ##  ['chrony-3.4-1.el7.x86_64']
+        ##  ['chrony-3.4-1.el7.x86_64', 'ntp-4.2.6p5-29.el7.centos.2.x86_64']
 
-        if len(r.stdout) == 2 and r.stdout[1] == "":
+        if len(r.stdout) == 1 and r.stdout != ['']:
             state = 0
         else:
             state = 1
@@ -1382,6 +1473,8 @@ class CISAudit:
     def audit_package_is_installed(self, package: str) -> int:
         cmd = f'rpm -q {package}'
         r = self._shellexec(cmd)
+
+        self.log.debug(f"'{cmd}', '{r}'")
 
         if r.returncode != 0:
             state = 1
@@ -1394,6 +1487,8 @@ class CISAudit:
         cmd = f'rpm -q {package}'
         r = self._shellexec(cmd)
 
+        self.log.debug(f"'{cmd}', '{r}'")
+
         if r.returncode == 1:
             state = 0
         else:
@@ -1404,14 +1499,15 @@ class CISAudit:
     def audit_package_not_installed_or_service_is_masked(self, package: str, service: str) -> int:
         state = 0
 
-        r1 = self.audit_package_not_installed(package)
-        r2 = self.audit_service_is_masked(service)
+        package_installed = bool(not self.audit_package_is_installed(package))
+        self.log.debug(f'package_installed = {package_installed}')
 
-        if r1 != 0:
-            state += 1
+        if package_installed:
+            service_masked = bool(not self.audit_service_is_masked(service))
+            self.log.debug(f'service_masked = {service_masked}')
 
-        if r2 != 0:
-            state += 2
+            if not service_masked:
+                state += 1
 
         return state
 
@@ -1447,10 +1543,11 @@ class CISAudit:
             state += 1
 
         for line in r2.stdout:
-            days = line.split(':')[1]
-            if not int(days) >= expected_min_days:
-                state += 2
-                break
+            if line != '':
+                days = line.split(':')[1]
+                if not int(days) >= expected_min_days:
+                    state += 2
+                    break
 
         return state
 
@@ -1467,10 +1564,11 @@ class CISAudit:
             state += 1
 
         for line in r2.stdout:
-            days = line.split(':')[1]
-            if not int(days) <= expected_max_days:
-                state += 2
-                break
+            if line != '':
+                days = line.split(':')[1]
+                if not int(days) <= expected_max_days:
+                    state += 2
+                    break
 
         return state
 
@@ -1478,7 +1576,7 @@ class CISAudit:
         state = 0
 
         cmd1 = R"grep ^\s*PASS_WARN_AGE /etc/login.defs"
-        cmd2 = R"grep -E '^[^:]+:[^!*]' /etc/shadow | cut -d: -f1,4"
+        cmd2 = R"grep -E '^[^:]+:[^!*]' /etc/shadow | cut -d: -f1,6"
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
@@ -1487,10 +1585,11 @@ class CISAudit:
             state += 1
 
         for line in r2.stdout:
-            days = line.split(':')[1]
-            if not int(days) >= expected_warn_days:
-                state += 2
-                break
+            if line != '':
+                days = line.split(':')[1]
+                if not int(days) >= expected_warn_days:
+                    state += 2
+                    break
 
         return state
 
@@ -1515,32 +1614,29 @@ class CISAudit:
         r2 = self._shellexec(cmd2)
 
         if r1.stdout[0].split('=')[1]:
-            configured_inactive_days = int(r1.stdout[0].split('=')[1])
+            default_inactive_days = int(r1.stdout[0].split('=')[1])
 
-        if not configured_inactive_days <= expected_inactive_days:
+        if default_inactive_days == -1 or default_inactive_days > expected_inactive_days:
             state += 1
-
-        if not configured_inactive_days > 0:
-            state += 2
 
         for line in r2.stdout:
             days = line.split(':')[1]
-            if days == '':
-                state += 4
-                break
-            elif not int(days) <= expected_inactive_days:
-                state += 8
+
+            if days == '' or int(days) > expected_inactive_days:
+                state += 2
                 break
 
         return state
 
     def audit_password_reuse_is_limited(self) -> int:
         state = 0
-        cmd = R"grep -P '^\s*password\s+(requisite|required)\s+(pam_pwhistory\.so|pam_unix.so)\s+([^#]+\s+)*remember=([5-9]|[1-9][0-9]+)\b' /etc/pam.d/system-auth /etc/pam.d/password-auth"
+        cmd1 = R"grep -P '^\s*password\s+(requisite|required)\s+pam_pwhistory\.so\s+([^#]+\s+)*remember=([5-9]|[1-9][0-9]+)\b' /etc/pam.d/system-auth /etc/pam.d/password-auth"
+        cmd2 = R"grep -P '^\s*password\s+(sufficient|requisite|required)\s+pam_unix\.so\s+([^#]+\s+)*remember=([5-9]|[1-9][0-9]+)\b' /etc/pam.d/system-auth /etc/pam.d/password-auth"
 
-        r = self._shellexec(cmd)
+        r1 = self._shellexec(cmd1)
+        r2 = self._shellexec(cmd2)
 
-        if len(r.stdout) < 2 or r.stdout[0] == '':
+        if len(r1.stdout) < 2 and len(r2.stdout) < 2:
             state += 1
 
         return state
@@ -1606,7 +1702,7 @@ class CISAudit:
         state = 0
         removable_mountpoints = self._shellexec("lsblk -o RM,MOUNTPOINT | awk '/1/ {print $2}'").stdout
 
-        for mountpoint in removable_mountpoints:
+        for mountpoint in removable_mountpoints:  # pragma: no cover
             if mountpoint != "":
                 cmd = Rf'findmnt -n "{mountpoint}" | grep -Ev "\b{option}\b"'
                 r = self._shellexec(cmd)
@@ -1621,13 +1717,13 @@ class CISAudit:
         cmd = R"awk -F: '($3 == 0) { print $1 }' /etc/passwd"
         r = self._shellexec(cmd)
 
-        if r.stdout != ['root', '']:
+        if r.stdout != ['root']:
             state += 1
 
         return state
 
     def audit_rsyslog_default_file_permission_is_configured(self) -> int:
-        cmd = R'grep ^\$FileCreateMode /etc/rsyslog.conf /etc/rsyslog.d/*.conf'
+        cmd = R'grep -h ^\$FileCreateMode /etc/rsyslog.conf /etc/rsyslog.d/*.conf'
         r = self._shellexec(cmd)
 
         if r.stdout[0] == '$FileCreateMode 0640':
@@ -1639,14 +1735,12 @@ class CISAudit:
 
     def audit_rsyslog_sends_logs_to_a_remote_log_host(self) -> int:
         cmd1 = R'grep -Eh "^\s*([^#]+\s+)?action\(([^#]+\s+)?\btarget=\"?[^#\"]+\"?\b" /etc/rsyslog.conf /etc/rsyslog.d/*.conf'  # https://regex101.com/r/Ud69Ey/4
-        cmd2 = R"grep -Eh '^[^#]\s*\S+\.\*\s+@' /etc/rsyslog.conf /etc/rsyslog.d/*.conf"
+        cmd2 = R"grep -Eh '^\s*[^#\s]*\.\*\s+@' /etc/rsyslog.conf /etc/rsyslog.d/*.conf"  # https://regex101.com/r/DMX1lZ/1
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
 
-        if r1.stdout[0] != '':
-            state = 0
-        elif r2.stdout[0] != '':
+        if r1.stdout[0] != '' or r2.stdout[0] != '':
             state = 0
         else:
             state = 1
@@ -1656,12 +1750,12 @@ class CISAudit:
     def audit_selinux_mode_is_enforcing(self) -> int:
         state = 0
 
-        cmd = R"sestatus | awk -F: '/^Current mode:/ {print $2}'"
+        cmd = R"sestatus | awk -F: '/^Current mode:/ {print $2}' | sed 's/\s*//'"
         r = self._shellexec(cmd)
         if r.stdout[0] != "enforcing":
             state += 1
 
-        cmd = R"sestatus | awk -F: '/^Mode from config file:/ {print $2}'"
+        cmd = R"sestatus | awk -F: '/^Mode from config file:/ {print $2}' | sed 's/\s*//'"
         r = self._shellexec(cmd)
         if r.stdout[0] != "enforcing":
             state += 2
@@ -1671,12 +1765,12 @@ class CISAudit:
     def audit_selinux_mode_not_disabled(self) -> int:
         state = 0
 
-        cmd = R"sestatus | awk -F: '/^Current mode:/ {print $2}'"
+        cmd = R"sestatus | awk -F: '/^Current mode:/ {print $2}' | sed 's/\s*//'"
         r = self._shellexec(cmd)
         if r.stdout[0] not in ["permissive", "enforcing"]:
             state += 1
 
-        cmd = R"sestatus | awk -F: '/^Mode from config file:/ {print $2}'"
+        cmd = R"sestatus | awk -F: '/^Mode from config file:/ {print $2}' | sed 's/\s*//'"
         r = self._shellexec(cmd)
         if r.stdout[0] not in ["permissive", "enforcing"]:
             state += 2
@@ -1711,7 +1805,7 @@ class CISAudit:
         if r.stdout[0] != "targeted":
             state += 1
 
-        cmd = R"sestatus | awk -F: '/Loaded policy/ {print $2}'"
+        cmd = R"sestatus | awk -F: '/Loaded policy/ {print $2}' | sed 's/\s*//'"
         r = self._shellexec(cmd)
         if r.stdout[0] != "targeted":
             state += 2
@@ -1722,7 +1816,7 @@ class CISAudit:
         state = 0
 
         cmd = f'systemctl is-active {service}'
-        r = self._shellexec(cmd, check=True)
+        r = self._shellexec(cmd)
         if r.stdout[0] != 'active':
             state += 1
 
@@ -1768,6 +1862,9 @@ class CISAudit:
 
         cmd = f'systemctl is-enabled {service}'
         r = self._shellexec(cmd)
+
+        self.log.debug(f"'{cmd}', '{r}'")
+
         if r.stdout[0] != 'masked':
             state += 1
 
@@ -1775,11 +1872,18 @@ class CISAudit:
 
     def audit_shadow_group_is_empty(self) -> int:
         state = 0
-        cmd = R"getent group shadow | awk -F: '{print $4}'"
+        cmd = R"awk -F: '/^shadow:/ {print $4}' /etc/group"
         r = self._shellexec(cmd)
 
         if r.stdout[0] != '':
-            state = 1
+            state += 1
+
+        gid = shellexec("awk -F: '/^shadow:/ {print $3}' /etc/group").stdout[0]
+
+        cmd = f"awk -F: '($4 == \"{gid}\") {{print $1}}' /etc/passwd"
+        r = self._shellexec(cmd)
+        if r.stdout != ['']:
+            state += 2
 
         return state
 
@@ -1838,7 +1942,7 @@ class CISAudit:
 
     def audit_sudo_commands_use_pty(self) -> int:
         state = 0
-        cmd = R"grep -Ei '^\s*Defaults\s+([^#]\S+,\s*)?use_pty\b' /etc/sudoers /etc/sudoers.d/*"
+        cmd = R"grep -hEi '^\s*Defaults\s+([^#]\S+,\s*)?use_pty\b' /etc/sudoers /etc/sudoers.d/*"
         r = self._shellexec(cmd)
 
         if r.stdout[0] != 'Defaults use_pty':
@@ -1848,7 +1952,7 @@ class CISAudit:
 
     def audit_sudo_log_exists(self) -> int:
         state = 0
-        cmd = R"grep -Ei '^\s*Defaults\s+([^#;]+,\s*)?logfile\s*=\s*(\")?[^#;]+(\")?' /etc/sudoers /etc/sudoers.d/*"
+        cmd = R"grep -hEi '^\s*Defaults\s+([^#;]+,\s*)?logfile\s*=\s*(\")?[^#;]+(\")?' /etc/sudoers /etc/sudoers.d/*"
         r = self._shellexec(cmd)
 
         if r.stdout[0] != 'Defaults logfile="/var/log/sudo.log"':
@@ -1866,9 +1970,9 @@ class CISAudit:
                 state += 2 ** (i * 2)
 
             cmd = f'grep -h "{flag}" /etc/sysctl.conf /etc/sysctl.d/*.conf'
-            # cmd = f'find /etc/sysctl.conf /etc/sysctl.d/ -regex ".*.conf"'
             r = self._shellexec(cmd)
-            if r.stdout != [f'{flag} = {value}', '']:
+
+            if r.stdout != [f'{flag} = {value}']:
                 state += 2 ** (i * 2 + 1)
 
         return state
@@ -1882,55 +1986,69 @@ class CISAudit:
         passwd_file = self._shellexec('cat /etc/passwd').stdout
 
         for line in passwd_file:
-            user = line.split(':')[0]
-            uid = int(line.split(':')[2])
-            shell = line.split(':')[6]
+            if line != '':
+                user = line.split(':')[0]
+                uid = int(line.split(':')[2])
+                shell = line.split(':')[6]
 
-            if user not in ignored_users and uid < uid_min:
-                if shell not in valid_shells:
-                    state = 1
+                if user not in ignored_users and uid < uid_min:
+                    if shell not in valid_shells:
+                        state = 1
+
+        self.log.debug(f'uid_min = {uid_min}')
+        self.log.debug(f'{passwd_file}')
 
         return state
 
     def audit_system_is_disabled_when_audit_logs_are_full(self) -> int:
         state = 0
 
-        cmd1 = R"grep 'space_left_action' /etc/audit/auditd.conf"
-        cmd2 = R"grep 'action_mail_acct' /etc/audit/auditd.conf"
-        cmd3 = R"grep 'action_mail_acct' /etc/audit/auditd.conf"
+        cmd1 = R"grep '^space_left_action =' /etc/audit/auditd.conf"
+        cmd2 = R"grep '^action_mail_acct =' /etc/audit/auditd.conf"
+        cmd3 = R"grep '^admin_space_left_action =' /etc/audit/auditd.conf"
 
         r1 = self._shellexec(cmd1)
         r2 = self._shellexec(cmd2)
         r3 = self._shellexec(cmd3)
 
-        if r1.returncode != 0:
+        if r1.stdout[0] != 'space_left_action = email':
             state += 1
 
-        if r2.returncode != 0:
+        if r2.stdout[0] != 'action_mail_acct = root':
             state += 2
 
-        if r3.returncode != 0:
+        if r3.stdout[0] != 'admin_space_left_action = halt':
             state += 4
 
         return state
 
     def audit_updates_installed(self) -> int:
-        state = 0
-
-        cmd = R'yum -q check-update | grep -v "^$"'
+        cmd = R'yum -q check-update'
         r = self._shellexec(cmd)
-        if len(r.stdout) != 0:
-            state += 1
+
+        ## From man 8 yum
+        ## Returns exit value of 100 if there are packages available for an update. Also returns a list of the packages to be updated in list format.
+        ## Returns 0 if no packages are available for update.
+        ## Returns 1 if an error occurred.
+
+        if r.returncode == 0:
+            state = 0
+        elif r.returncode == 1:
+            state = -1
+        elif r.returncode == 100:
+            state = 1
 
         return state
 
-    def audit_xdcmp_not_enabled(self) -> int:
+    def audit_xdmcp_not_enabled(self) -> int:
         state = 0
 
-        cmd = R"awk '{RS=\"[\"} /xdmcp/ {print $0}' /etc/gdm/custom.conf | grep -Eis '^\s*Enable\s*=\s*true'"
-        r = self._shellexec(cmd)
-        if r.stdout != [""]:
-            state += 1
+        if os.path.exists('/etc/gdm/'):
+            cmd = R'''awk '{RS="["} /xdmcp/ {print $0}' /etc/gdm/custom.conf | grep -Eis '^\s*Enable\s*=\s*true' '''
+            r = self._shellexec(cmd)
+
+            if r.stdout != ['']:
+                state += 1
 
         return state
 
@@ -1999,7 +2117,7 @@ class CISAudit:
             row_length = len(row)
 
             ## In the following section, len_level and len_duration are commented out because the
-            ## headers are wider than the data in the rows, so they currently don't need expanding
+            ## headers are wider than the data in the rows, so they currently don't need expanding.
             ## If I leave them uncommented, then codecov complains about the tests not covering them.
 
             len_id = len(str(row[0])) if row_length >= 1 else None
@@ -2085,7 +2203,7 @@ class CISAudit:
                 test_type = 'notimplemented'
 
             ## Check whether this test_id is included
-            if self._test_is_included(test_id, test_level):
+            if self._is_test_included(test_id, test_level):
                 if test_type == 'header':
                     results.append((test_id, test_description))
 
@@ -2201,8 +2319,8 @@ benchmarks = {
             {'_id': "1.8", 'description': "Gnome Display Manager", 'type': "header"},
             {'_id': "1.8.1", 'description': "Ensure GNOME Display Manager is removed", 'function': CISAudit.audit_package_not_installed, 'levels': {'server': 2, 'workstation': None}, 'kwargs': {'package': 'gdm'}},
             {'_id': "1.8.2", 'description': "Ensure GDM login banner is configured", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "1.8.3", 'description': "Ensure last logged in user display is disabled", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "1.8.4", 'description': "Ensure XDCMP is not enabled", 'function': CISAudit.audit_xdcmp_not_enabled, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "1.8.3", 'description': "Ensure last logged in user display is disabled", 'function': CISAudit.audit_gdm_last_user_logged_in_disabled, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "1.8.4", 'description': "Ensure XDCMP is not enabled", 'function': CISAudit.audit_xdmcp_not_enabled, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "1.9", 'description': 'Ensure updates, patches, and additional security software are installed', 'function': CISAudit.audit_updates_installed, 'levels': {'server': 1, 'workstation': 1}, 'type': "manual"},
             {'_id': "2", 'description': "Services", 'type': "header"},
             {'_id': "2.1", 'description': "inetd Services", 'type': "header"},
@@ -2274,7 +2392,7 @@ benchmarks = {
             {'_id': "3.5.2.5", 'description': "Ensure an nftables table exists", 'function': CISAudit.audit_nftables_table_exists, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.2.6", 'description': "Ensure nftables base chains exist", 'function': CISAudit.audit_nftables_base_chains_exist, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.2.7", 'description': "Ensure nftables loopback traffic is configured", 'function': CISAudit.audit_nftables_loopback_is_configured, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "3.5.2.8", 'description': "Ensure nftables outbound and establishe dconnections are configured", 'function': CISAudit.audit_nftables_connections_are_configured, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "3.5.2.8", 'description': "Ensure nftables outbound and establishe dconnections are configured", 'function': CISAudit.audit_nftables_outbound_and_established_connections, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.2.9", 'description': "Ensure nftables default deny firewall policy exists", 'function': CISAudit.audit_nftables_default_deny_policy, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.2.10", 'description': "Ensure nftables service is enabled", 'function': CISAudit.audit_service_is_enabled, 'kwargs': {'service': "nftables"}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.2.11", 'description': "Ensure nftables rules are permanent", 'function': None, 'levels': {'server': 1, 'workstation': 1}},
@@ -2285,14 +2403,14 @@ benchmarks = {
             {'_id': "3.5.3.1.3", 'description': "Ensure firewalld is not installed with iptables", 'function': CISAudit.audit_package_not_installed, 'kwargs': {'package': "firewalld"}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.3.2", 'description': "Configure IPv4 iptables", 'type': "header"},
             {'_id': "3.5.3.2.1", 'description': "Ensure iptables loopback traffic is configured", 'function': CISAudit.audit_iptables_loopback_is_configured, 'kwargs': {'ip_version': 'ipv4'}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "3.5.3.2.2", 'description': "Ensure iptables outbound and established connections are configured", 'function': CISAudit.audit_iptables_outbound_and_established, 'kwargs': {'ip_version': 'ipv4'}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "3.5.3.2.2", 'description': "Ensure iptables outbound and established connections are configured", 'function': CISAudit.audit_iptables_outbound_and_established_connections, 'kwargs': {'ip_version': 'ipv4'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.3.2.2", 'description': "Ensure iptables rules exist for all open ports", 'levels': {'server': 1, 'workstation': 1}, 'type': "manual"},
             {'_id': "3.5.3.2.4", 'description': "Ensure iptables default deny firewall policy", 'function': CISAudit.audit_iptables_default_deny_policy, 'kwargs': {'ip_version': 'ipv4'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.3.2.5", 'description': "Ensure iptables rules are saved", 'function': CISAudit.audit_iptables_rules_are_saved, 'kwargs': {'ip_version': 'ipv4'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.3.2.6", 'description': "Ensure iptables is enabled and running", 'function': CISAudit.audit_service_is_enabled_and_is_active, 'kwargs': {'service': 'iptables'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.3.3", 'description': "Configure IPv6 ip6tables", 'type': "header"},
             {'_id': "3.5.3.3.1", 'description': "Ensure ip6tables loopback traffic is configured", 'function': CISAudit.audit_iptables_loopback_is_configured, 'kwargs': {'ip_version': 'ipv6'}, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "3.5.3.3.2", 'description': "Ensure ip6tables outbound and established connections are configured", 'function': CISAudit.audit_iptables_outbound_and_established, 'kwargs': {'ip_version': 'ipv6'}, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "3.5.3.3.2", 'description': "Ensure ip6tables outbound and established connections are configured", 'function': CISAudit.audit_iptables_outbound_and_established_connections, 'kwargs': {'ip_version': 'ipv6'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.3.3.2", 'description': "Ensure ip6tables rules exist for all open ports", 'levels': {'server': 1, 'workstation': 1}, 'type': "manual"},
             {'_id': "3.5.3.3.4", 'description': "Ensure ip6tables default deny firewall policy", 'function': CISAudit.audit_iptables_default_deny_policy, 'kwargs': {'ip_version': 'ipv6'}, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "3.5.3.3.5", 'description': "Ensure ip6tables rules are saved", 'function': CISAudit.audit_iptables_rules_are_saved, 'kwargs': {'ip_version': 'ipv6'}, 'levels': {'server': 1, 'workstation': 1}},

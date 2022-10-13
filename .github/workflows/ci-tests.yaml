@@ -1,0 +1,86 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: CI Tests
+
+on: [push]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.6']
+
+    steps:
+      - uses: actions/checkout@v3 # https://github.com/actions/cache/releases
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4 # https://github.com/actions/setup-python/releases
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pipenv
+          pipenv lock -r --dev > requirements.txt
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Lint with flake8
+        run: |
+          flake8 *.py
+          flake8 tests/*/*.py
+
+      - name: Format with black
+        run: |
+          black --check cis_audit.py
+          black --check tests/*/*.py
+
+      - name: Test with pytest
+        run: |
+          pytest tests/unit
+          coverage xml
+
+      #- name: Codecov
+      #  uses: codecov/codecov-action@v3  # https://github.com/codecov/codecov-action/releases
+      #
+      #  with:
+      #    files: coverage.xml
+
+  integration-tests:
+    runs-on: macos-12
+    needs: unit-tests
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['centos7']
+
+    steps:
+      - uses: actions/checkout@v3 # https://github.com/actions/cache/releases
+
+      - name: Cache Vagrant boxes
+        uses: actions/cache@v3 # https://github.com/actions/cache/releases
+        with:
+          path: ~/.vagrant.d/boxes
+          key: ${{ runner.os }}-vagrant-boxes-${{ hashFiles('Vagrantfile') }}
+          restore-keys: |
+            ${{ runner.os }}-vagrant-boxes-
+
+      - name: Cache Vagrant machines
+        uses: actions/cache@v3 # https://github.com/actions/cache/releases
+        with:
+          path: ~/VirtualBox VMs
+          key: ${{ runner.os }}-vagrant-machines-${{ hashFiles('Vagrantfile') }}
+          restore-keys: |
+            ${{ runner.os }}-vagrant-machines-
+
+      - name: Show Vagrant version
+        run: vagrant --version
+
+      - name: Run vagrant up
+        run: vagrant up ${{ matrix.os }}
+
+      - name: Run integration tests on ${{ matrix.os }}
+        run: vagrant ssh ${{ matrix.os }} -c 'cd /vagrant && sudo PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin /root/.local/bin/pytest tests/integration'
