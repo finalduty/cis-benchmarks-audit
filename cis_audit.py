@@ -860,7 +860,7 @@ class CISAudit:
         """
         """
             When looping over each of the permission bits. If the bits do not match or are not more restrictive, increment the failure state value by a unique amount, per below. This allows us to determine from the return value, which permissions did not match:
-            
+
               index | penalty | description
              -------|---------|-------------
                 -   |   1     | User did not match
@@ -2535,7 +2535,7 @@ benchmarks = {
             {'_id': "6.2.3", 'description': "Ensure all groups in /etc/passwd exist in /etc/group", 'function': CISAudit.audit_etc_passwd_gids_exist_in_etc_group, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.4", 'description': "Ensure shadow group is empty", 'function': CISAudit.audit_shadow_group_is_empty, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.5", 'description': "Ensure no duplicate user names exist", 'function': CISAudit.audit_duplicate_user_names, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.2.6", 'description': "Ensure no duplicate user names exist", 'function': CISAudit.audit_duplicate_user_names, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.2.6", 'description': "Ensure no duplicate group names exist", 'function': CISAudit.audit_duplicate_group_names, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.7", 'description': "Ensure no duplicate UIDs exist", 'function': CISAudit.audit_duplicate_uids, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.8", 'description': "Ensure no duplicate GIDs exist", 'function': CISAudit.audit_duplicate_gids, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.9", 'description': "Ensure root is the only UID 0 account", 'function': CISAudit.audit_root_is_only_uid_0_account, 'levels': {'server': 1, 'workstation': 1}},
@@ -2570,19 +2570,19 @@ def parse_arguments(argv=sys.argv):
     description = "This script runs tests on the system to check for compliance against the CIS Benchmarks. No changes are made to system files by this script."
     epilog = f"""
 Examples:
-    
+
     Run with debug enabled:
     {__file__} --debug
-        
+
     Exclude tests from section 1.1 and 1.3.2:
     {__file__} --exclude 1.1 1.3.2
-        
+
     Include tests only from section 4.1 but exclude tests from section 4.1.1:
     {__file__} --include 4.1 --exclude 4.1.1
-        
+
     Run only level 1 tests
     {__file__} --level 1
-        
+
     Run level 1 tests and include some but not all SELinux questions
     {__file__} --level 1 --include 1.6 --exclude 1.6.1.2
     """
