@@ -1463,7 +1463,7 @@ class CISAudit:
         ##  ['chrony-3.4-1.el7.x86_64']
         ##  ['chrony-3.4-1.el7.x86_64', 'ntp-4.2.6p5-29.el7.centos.2.x86_64']
 
-        if len(r.stdout) == 1 and r.stdout != ['']:
+        if len(r.stdout) >= 1 and r.stdout != ['']:
             state = 0
         else:
             state = 1
@@ -1661,7 +1661,7 @@ class CISAudit:
         cmd = R"/usr/sbin/sshd -T"
         r = self._shellexec(cmd)
 
-        regex = re.compile(R'^hostkey\s')
+        regex = re.compile(R'_key$\s')
         for line in r.stdout:
             if regex.match(line):
                 files.append(line.split()[1])
@@ -1684,7 +1684,7 @@ class CISAudit:
         cmd = R"/usr/sbin/sshd -T"
         r = self._shellexec(cmd)
 
-        regex = re.compile(R'^hostkey\s')
+        regex = re.compile(R'_key\s')
         for line in r.stdout:
             if regex.match(line):
                 files.append(line.split()[1])
