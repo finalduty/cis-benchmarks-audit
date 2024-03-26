@@ -6,21 +6,32 @@ from mock import patch
 from cis_audit import CISAudit
 
 mock_data = [
-    ('1', 'section header'),
+    {'_id': '1', 'description': 'section header'},
 ]
 
 
-def mock_output_function(self, data, separator=None):
+def mock_output_function(self, results, separator=None, host_os=None, benchmark_version=None, stats=None):
     print(separator)
-    print(data)
+    print(results)
 
+
+host_os = 'CentOS 7'
+benchmark_version = '3.1.2'
+stats = {
+    'passed': 5,
+    'failed': 3,
+    'skipped': 2,
+    'errors': 1,
+    'duration': 20,
+    'total': 9,
+}
 
 test = CISAudit()
 
 
 @patch.object(CISAudit, 'output_csv', mock_output_function)
 def test_output_calls_csv_function(capfd):
-    test.output(format='csv', data=mock_data)
+    test.output(format='csv', results=mock_data, host_os=host_os, benchmark_version=benchmark_version, stats=stats)
     stdout, stderr = capfd.readouterr()
 
     output = stdout.split('\n')
@@ -31,7 +42,7 @@ def test_output_calls_csv_function(capfd):
 
 @patch.object(CISAudit, 'output_csv', mock_output_function)
 def test_output_calls_psv_function(capfd):
-    test.output(format='psv', data=mock_data)
+    test.output(format='psv', results=mock_data, host_os=host_os, benchmark_version=benchmark_version, stats=stats)
     stdout, stderr = capfd.readouterr()
 
     output = stdout.split('\n')
@@ -42,7 +53,7 @@ def test_output_calls_psv_function(capfd):
 
 @patch.object(CISAudit, 'output_csv', mock_output_function)
 def test_output_calls_tsv_function(capfd):
-    test.output(format='tsv', data=mock_data)
+    test.output(format='tsv', results=mock_data, host_os=host_os, benchmark_version=benchmark_version, stats=stats)
     stdout, stderr = capfd.readouterr()
 
     output = stdout.split('\n')
@@ -53,7 +64,7 @@ def test_output_calls_tsv_function(capfd):
 
 @patch.object(CISAudit, 'output_json', mock_output_function)
 def test_output_calls_json_function(capfd):
-    test.output(format='json', data=mock_data)
+    test.output(format='json', results=mock_data, host_os=host_os, benchmark_version=benchmark_version, stats=stats)
     stdout, stderr = capfd.readouterr()
 
     output = stdout.split('\n')
@@ -64,7 +75,7 @@ def test_output_calls_json_function(capfd):
 
 @patch.object(CISAudit, 'output_text', mock_output_function)
 def test_output_calls_text_function(capfd):
-    test.output(format='text', data=mock_data)
+    test.output(format='text', results=mock_data, host_os=host_os, benchmark_version=benchmark_version, stats=stats)
     stdout, stderr = capfd.readouterr()
 
     output = stdout.split('\n')

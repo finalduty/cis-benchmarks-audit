@@ -9,7 +9,7 @@
 # You can obtain a copy of the CIS Benchmarks from https://www.cisecurity.org/cis-benchmarks/
 # Use of the CIS Benchmarks are subject to the Terms of Use for Non-Member CIS Products - https://www.cisecurity.org/terms-of-use-for-non-member-cis-products
 
-__version__ = '0.20.0-alpha.3'
+__version__ = '0.20.0-rc.1'
 
 ### Imports ###
 import json  # https://docs.python.org/3/library/json.html
@@ -860,7 +860,7 @@ class CISAudit:
         """
         """
             When looping over each of the permission bits. If the bits do not match or are not more restrictive, increment the failure state value by a unique amount, per below. This allows us to determine from the return value, which permissions did not match:
-            
+
               index | penalty | description
              -------|---------|-------------
                 -   |   1     | User did not match
@@ -893,7 +893,7 @@ class CISAudit:
         try:
             file_stat = os.stat(file)
         except Exception as e:
-            self.log.warning(f'Error trying to stat file {file}: "{e}"')
+            self.log.debug(f'Error trying to stat file {file}: "{e}"')
             return -1
 
         file_user = getpwuid(file_stat.st_uid).pw_name
@@ -2052,59 +2052,73 @@ class CISAudit:
 
         return state
 
-    def output(self, format: str, data: list) -> None:
+    def output(self, format: str, results: list, host_os: str, benchmark_version: str, stats: dict) -> None:
         if format in ['csv', 'psv', 'tsv']:
             if format == 'csv':
-                sep = ','
+                separator = ','
             elif format == 'psv':
-                sep = '|'
+                separator = '|'
             elif format == 'tsv':
-                sep = '\t'
+                separator = '\t'
 
-            self.output_csv(data, separator=sep)
+            self.output_csv(results=results, separator=separator, host_os=host_os, benchmark_version=benchmark_version)
 
         elif format == 'json':
-            self.output_json(data)
+            self.output_json(results=results, host_os=host_os, benchmark_version=benchmark_version, stats=stats)
 
         elif format == 'text':
-            self.output_text(data)
+            self.output_text(results=results, host_os=host_os, benchmark_version=benchmark_version, stats=stats)
 
-    def output_csv(self, data: list, separator: str):
+    def output_csv(self, results: list, separator: str, host_os, benchmark_version):
         ## Shorten the variable name so that it's easier to construct the print's below
         sep = separator
 
         ## Print Header
+        print(f'CIS {host_os} Benchmark v{benchmark_version} Results')
         print(f'ID{sep}Description{sep}Level{sep}Result{sep}Duration')
 
         ## Print Data
-        for record in data:
-            if len(record) == 2:
-                print(f'{record[0]}{sep}"{record[1]}"{sep}{sep}{sep}')
-            elif len(record) == 4:
-                print(f'{record[0]}{sep}"{record[1]}"{sep}{record[2]}{sep}{record[3]}{sep}')
-            elif len(record) == 5:
-                print(f'{record[0]}{sep}"{record[1]}"{sep}{record[2]}{sep}{record[3]}{sep}{record[4]}')
+        for entry in results:
+            id = entry['_id']
+            description = entry['description']
+            if 'level' in entry:
+                level = entry['level']
+            if 'result' in entry:
+                result = entry['result']
+            if 'duration' in entry:
+                duration = entry['duration']
 
-    def output_json(self, data):
+            if len(entry) == 2:
+                print(f'{id}{sep}"{description}"{sep}{sep}{sep}')
+            elif len(entry) == 4:
+                print(f'{id}{sep}"{description}"{sep}{level}{sep}{result}{sep}')
+            elif len(entry) == 5:
+                print(f'{id}{sep}"{description}"{sep}{level}{sep}{result}{sep}{duration}')
+
+    def output_json(self, results, host_os, benchmark_version, stats):
         output = {}
+        output['metadata'] = stats
+        output['metadata']['host_os'] = host_os
+        output['metadata']['benchmark_version'] = benchmark_version
+        # output['results'] = {}
+        output['results'] = results
+        # for result in results:
+        #    id = result[0]
+        #    output['results'][id] = {}
+        #    output['results'][id]['description'] = result[1]
 
-        for record in data:
-            id = record[0]
-            output[id] = {}
-            output[id]['description'] = record[1]
+        #    if len(result) >= 3:
+        #        output['results'][id]['level'] = result[2]
 
-            if len(record) >= 3:
-                output[id]['level'] = record[2]
+        #    if len(result) >= 4:
+        #        output['results'][id]['result'] = result[3]
 
-            if len(record) >= 4:
-                output[id]['result'] = record[3]
-
-            if len(record) >= 5:
-                output[id]['duration'] = record[4]
+        #    if len(result) >= 5:
+        #        output['results'][id]['duration'] = result[4]
 
         print(json.dumps(output))
 
-    def output_text(self, data):
+    def output_text(self, results, host_os, benchmark_version, stats):
         ## Set starting/minimum width of columns to fit the column headers
         width_id = len("ID")
         width_description = len("Description")
@@ -2113,18 +2127,18 @@ class CISAudit:
         width_duration = len("Duration")
 
         ## Find the max width of each column
-        for row in data:
-            row_length = len(row)
+        for entry in results:
+            row_length = len(entry)
 
             ## In the following section, len_level and len_duration are commented out because the
             ## headers are wider than the data in the rows, so they currently don't need expanding.
             ## If I leave them uncommented, then codecov complains about the tests not covering them.
 
-            len_id = len(str(row[0])) if row_length >= 1 else None
-            len_description = len(str(row[1])) if row_length >= 2 else None
-            # len_level = len(str(row[2])) if row_length >= 3 else None
-            len_result = len(str(row[3])) if row_length >= 4 else None
-            # len_duration = len(str(row[4])) if row_length >= 5 else None
+            len_id = len(str(entry['_id'])) if row_length >= 1 else None
+            len_description = len(str(entry['description'])) if row_length >= 2 else None
+            # len_level = len(str(row['level'])) if row_length >= 3 else None
+            len_result = len(str(entry['result'])) if row_length >= 4 else None
+            # len_duration = len(str(row['durtion'])) if row_length >= 5 else None
 
             if len_id and len_id > width_id:
                 width_id = len_id
@@ -2142,23 +2156,67 @@ class CISAudit:
             # if len_duration and len_duration > width_duration:
             #    width_duration = len_duration
 
-        ## Print column headers
+        ## Print title
+        title = f'CIS {host_os} Benchmark v{benchmark_version} Results'
+        print(title)
+        print(f'{"-" :-<{len(title)}}')
+
+        ## Print headers
         print(f'{"ID" : <{width_id}}  {"Description" : <{width_description}}  {"Level" : ^{width_level}}  {"Result" : ^{width_result}}  {"Duration" : >{width_duration}}')
         print(f'{"--" :-<{width_id}}  {"-----------" :-<{width_description}}  {"-----" :-^{width_level}}  {"------" :-^{width_result}}  {"--------" :->{width_duration}}')
 
         ## Print Data
-        for row in data:
-            id = row[0] if len(row) >= 1 else ""
-            description = row[1] if len(row) >= 2 else ""
-            level = row[2] if len(row) >= 3 else ""
-            result = row[3] if len(row) >= 4 else ""
-            duration = row[4] if len(row) >= 5 else ""
+        for entry in results:
+            id = entry['_id']
+            description = entry['description']
+            level = entry['level'] if 'level' in entry else ""
+            result = entry['result'] if 'result' in entry else ""
+            duration = entry['duration'] if 'duration' in entry else ""
 
             ## Print blank row before new major sections
             if len(id) == 1:
                 print()
 
             print(f'{id: <{width_id}}  {description: <{width_description}}  {level: ^{width_level}}  {result: ^{width_result}}  {duration: >{width_duration}}')
+
+        ## Print trailers
+        passed = stats['passed']
+        skipped = stats['skipped']
+        errors = stats['errors']
+        total = stats['total']
+        duration = stats['duration']
+
+        print()
+        print(f'Passed {passed} of {total} tests in {duration} seconds ({skipped} Skipped, {errors} Errors)')
+
+    def result_stats(self, results: dict, start_time, end_time) -> dict:
+        passed = 0
+        failed = 0
+        skipped = 0
+        errors = 0
+
+        time_delta = (end_time - start_time).total_seconds()
+        if time_delta >= 10:
+            duration = round(time_delta, 0)
+        else:
+            duration = round(time_delta, 2)
+
+        for entry in results:
+            if 'result' in entry:
+                if entry['result'] == 'Pass':
+                    passed += 1
+                elif entry['result'] == 'Fail':
+                    failed += 1
+                elif entry['result'] == 'Skipped':
+                    skipped += 1
+                elif entry['result'] == 'Error':
+                    errors += 1
+
+        total = passed + failed + errors
+
+        stats = {'passed': passed, 'failed': failed, 'skipped': skipped, 'errors': errors, 'total': total, 'duration': duration}
+
+        return stats
 
     def run_tests(self, tests: "list[dict]") -> dict:
         results = []
@@ -2205,16 +2263,16 @@ class CISAudit:
             ## Check whether this test_id is included
             if self._is_test_included(test_id, test_level):
                 if test_type == 'header':
-                    results.append((test_id, test_description))
+                    results.append({'_id': test_id, 'description': test_description})
 
                 elif test_type == 'manual':
-                    results.append((test_id, test_description, test_level, 'Manual'))
+                    results.append({'_id': test_id, 'description': test_description, 'level': test_level, 'result': 'Manual'})
 
                 elif test_type == 'skip':
-                    results.append((test_id, test_description, test_level, 'Skipped'))
+                    results.append({'_id': test_id, 'description': test_description, 'level': test_level, 'result': 'Skipped'})
 
                 elif test_type == 'notimplemented':
-                    results.append((test_id, test_description, test_level, 'Not Implemented'))
+                    results.append({'_id': test_id, 'description': test_description, 'level': test_level, 'result': 'Not Implemented'})
 
                 elif test_type == 'test':
                     start_time = self._get_utcnow()
@@ -2232,7 +2290,7 @@ class CISAudit:
                         state = -1
 
                     end_time = self._get_utcnow()
-                    duration = f'{int((end_time.microsecond - start_time.microsecond) / 1000)}ms'
+                    test_duration = f'{int((end_time.microsecond - start_time.microsecond) / 1000)}ms'
 
                     if state == 0:
                         self.log.debug(f'Test {test_id} passed')
@@ -2245,14 +2303,14 @@ class CISAudit:
                         self.log.debug(f'Test {test_id} failed with state {state}')
                         result = "Fail"
 
-                    results.append((test_id, test_description, test_level, result, duration))
+                    results.append({'_id': test_id, 'description': test_description, 'level': test_level, 'result': result, 'duration': test_duration})
 
         return results
 
 
 ### Benchmarks ###
 benchmarks = {
-    'centos7': {
+    'CentOS 7': {
         '3.1.2': [
             {'_id': "1", 'description': "Initial Setup", 'type': "header"},
             {'_id': "1.1", 'description': "Filesystem Configuration", 'type': "header"},
@@ -2535,7 +2593,7 @@ benchmarks = {
             {'_id': "6.2.3", 'description': "Ensure all groups in /etc/passwd exist in /etc/group", 'function': CISAudit.audit_etc_passwd_gids_exist_in_etc_group, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.4", 'description': "Ensure shadow group is empty", 'function': CISAudit.audit_shadow_group_is_empty, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.5", 'description': "Ensure no duplicate user names exist", 'function': CISAudit.audit_duplicate_user_names, 'levels': {'server': 1, 'workstation': 1}},
-            {'_id': "6.2.6", 'description': "Ensure no duplicate user names exist", 'function': CISAudit.audit_duplicate_user_names, 'levels': {'server': 1, 'workstation': 1}},
+            {'_id': "6.2.6", 'description': "Ensure no duplicate group names exist", 'function': CISAudit.audit_duplicate_group_names, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.7", 'description': "Ensure no duplicate UIDs exist", 'function': CISAudit.audit_duplicate_uids, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.8", 'description': "Ensure no duplicate GIDs exist", 'function': CISAudit.audit_duplicate_gids, 'levels': {'server': 1, 'workstation': 1}},
             {'_id': "6.2.9", 'description': "Ensure root is the only UID 0 account", 'function': CISAudit.audit_root_is_only_uid_0_account, 'levels': {'server': 1, 'workstation': 1}},
@@ -2557,32 +2615,38 @@ def main():  # pragma: no cover
     config = parse_arguments()
     audit = CISAudit(config=config)
 
-    host_os = 'centos7'
+    host_os = 'CentOS 7'
     benchmark_version = '3.1.2'
 
     # test_list = audit.get_tests_list(host_os, benchmarks_version)
     test_list = benchmarks[host_os][benchmark_version]
+
+    start_time = datetime.utcnow()
     results = audit.run_tests(test_list)
-    audit.output(config.outformat, results)
+    end_time = datetime.utcnow()
+
+    stats = audit.result_stats(results, start_time, end_time)
+
+    audit.output(config.outformat, results, host_os, benchmark_version, stats)
 
 
 def parse_arguments(argv=sys.argv):
     description = "This script runs tests on the system to check for compliance against the CIS Benchmarks. No changes are made to system files by this script."
     epilog = f"""
 Examples:
-    
+
     Run with debug enabled:
     {__file__} --debug
-        
+
     Exclude tests from section 1.1 and 1.3.2:
     {__file__} --exclude 1.1 1.3.2
-        
+
     Include tests only from section 4.1 but exclude tests from section 4.1.1:
     {__file__} --include 4.1 --exclude 4.1.1
-        
+
     Run only level 1 tests
     {__file__} --level 1
-        
+
     Run level 1 tests and include some but not all SELinux questions
     {__file__} --level 1 --include 1.6 --exclude 1.6.1.2
     """

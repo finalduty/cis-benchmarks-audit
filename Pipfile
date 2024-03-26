@@ -12,8 +12,8 @@ flake8 = "*"
 isort = "*"
 mock = "*"
 pyfakefs = "<4.6.0"
+pytest = "*"
 pytest-cov = "*"
-vermin = "*"
 
 [requires]
 python_version = "3.6"

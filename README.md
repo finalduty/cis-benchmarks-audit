@@ -3,8 +3,8 @@
   <a href="https://github.com/finalduty/cis-benchmarks-audit/tags">
     <img alt="Latest version" src="https://img.shields.io/github/v/tag/finalduty/cis-benchmarks-audit?include_prereleases&label=latest&logo=python">
   </a>
-  <a href="https://github.com/finalduty/cis-benchmarks-audit/actions/workflows/build.yaml">
-    <img alt="GitHub Actions" src="https://github.com/finalduty/cis-benchmarks-audit/actions/workflows/build.yaml/badge.svg">
+  <a href="https://github.com/finalduty/cis-benchmarks-audit/actions/workflows/ci-tests.yaml">
+    <img alt="GitHub Actions" src="https://github.com/finalduty/cis-benchmarks-audit/actions/workflows/ci-tests.yaml/badge.svg">
   </a>
 
   <a href="http://creativecommons.org/licenses/by-nc-sa/4.0/">
@@ -21,7 +21,7 @@
   </a>
 </p>
 
-This repo provides an unofficial, standalone, zero-install, zero-dependency, Python 3 application which can check your system against published CIS Hardening Benchmarks to offer an indication of your system's preparedness for compliance to the official standard.
+This repo provides an unofficial, standalone, zero-install, zero-dependency, Python 3 script which can check your system against published CIS Hardening Benchmarks to offer an indication of your system's preparedness for compliance to the official standard.
 
 
 ### How do I use this?

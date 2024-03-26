@@ -5,22 +5,34 @@ import pytest
 from cis_audit import CISAudit
 
 results = [
-    ('1', 'section header'),
-    ('1.1', 'subsection header'),
-    ('1.1.1', 'test 1.1.1', 1, 'Pass', '1ms'),
-    ('2', 'section header'),
-    ('2.1', 'test 2.1', 1, 'Fail', '10ms'),
-    ('2.2', 'test 2.2', 2, 'Pass', '100ms'),
-    ('2.3', 'test 2.3', 1, 'Not Implemented'),
+    {'_id': '1', 'description': 'section header'},
+    {'_id': '1.1', 'description': 'subsection header'},
+    {'_id': '1.1.1', 'description': 'test 1.1.1', 'level': 1, 'result': 'Pass', 'duration': '1ms'},
+    {'_id': '2', 'description': 'section header'},
+    {'_id': '2.1', 'description': 'test 2.1', 'level': 1, 'result': 'Fail', 'duration': '10ms'},
+    {'_id': '2.2', 'description': 'test 2.2', 'level': 2, 'result': 'Pass', 'duration': '100ms'},
+    {'_id': '2.3', 'description': 'test 2.3', 'level': 1, 'result': 'Not Implemented'},
 ]
+
+host_os = 'CentOS 7'
+benchmark_version = '3.1.2'
+stats = {
+    'passed': 5,
+    'failed': 3,
+    'skipped': 2,
+    'errors': 1,
+    'total': 9,
+    'duration': 20,
+}
 
 
 def test_output_json(capsys):
-    CISAudit().output_json(data=results)
+    CISAudit().output_json(results=results, host_os=host_os, benchmark_version=benchmark_version, stats=stats)
 
     output, error = capsys.readouterr()
     assert error == ''
-    assert output == '{"1": {"description": "section header"}, "1.1": {"description": "subsection header"}, "1.1.1": {"description": "test 1.1.1", "level": 1, "result": "Pass", "duration": "1ms"}, "2": {"description": "section header"}, "2.1": {"description": "test 2.1", "level": 1, "result": "Fail", "duration": "10ms"}, "2.2": {"description": "test 2.2", "level": 2, "result": "Pass", "duration": "100ms"}, "2.3": {"description": "test 2.3", "level": 1, "result": "Not Implemented"}}\n'
+    print(output)
+    assert output == '{"metadata": {"passed": 5, "failed": 3, "skipped": 2, "errors": 1, "total": 9, "duration": 20, "host_os": "CentOS 7", "benchmark_version": "3.1.2"}, "results": [{"_id": "1", "description": "section header"}, {"_id": "1.1", "description": "subsection header"}, {"_id": "1.1.1", "description": "test 1.1.1", "level": 1, "result": "Pass", "duration": "1ms"}, {"_id": "2", "description": "section header"}, {"_id": "2.1", "description": "test 2.1", "level": 1, "result": "Fail", "duration": "10ms"}, {"_id": "2.2", "description": "test 2.2", "level": 2, "result": "Pass", "duration": "100ms"}, {"_id": "2.3", "description": "test 2.3", "level": 1, "result": "Not Implemented"}]}\n'
 
 
 if __name__ == '__main__':

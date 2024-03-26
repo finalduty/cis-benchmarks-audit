@@ -19,7 +19,7 @@ test = CISAudit()
 
 
 def test_integration_output_csv(capsys):
-    CISAudit().output(data=data, format='csv')
+    CISAudit().output(results=data, format='csv')
 
     output, error = capsys.readouterr()
     assert error == ''
@@ -34,7 +34,7 @@ def test_integration_output_csv(capsys):
 
 
 def test_integration_output_json(capsys):
-    CISAudit().output(data=data, format='json')
+    CISAudit().output(results=data, format='json')
 
     output, error = capsys.readouterr()
     assert error == ''
@@ -42,7 +42,7 @@ def test_integration_output_json(capsys):
 
 
 def test_integration_output_psv(capsys):
-    CISAudit().output(data=data, format='psv')
+    CISAudit().output(results=data, format='psv')
 
     output, error = capsys.readouterr()
     assert error == ''
@@ -57,7 +57,7 @@ def test_integration_output_psv(capsys):
 
 
 def test_integration_output_text(capsys):
-    CISAudit().output(data=data, format='text')
+    CISAudit().output(results=data, format='text')
 
     output, error = capsys.readouterr()
     print(output)
@@ -77,7 +77,7 @@ def test_integration_output_text(capsys):
 
 
 def test_integration_output_tsv(capsys):
-    CISAudit().output(data=data, format='tsv')
+    CISAudit().output(results=data, format='tsv')
 
     output, error = capsys.readouterr()
     assert error == ''
