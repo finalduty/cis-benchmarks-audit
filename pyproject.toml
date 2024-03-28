@@ -5,6 +5,8 @@ target-version = ['py36']
 
 [tool.isort]
 profile = "black"
+line_length = 256
+float_to_top = "true"
 
 ## https://docs.pytest.org/en/7.1.x/reference/customize.html#pyproject-toml
 [tool.pytest.ini_options]

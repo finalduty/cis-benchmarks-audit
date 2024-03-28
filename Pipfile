@@ -14,6 +14,12 @@ mock = "*"
 pyfakefs = "<4.6.0"
 pytest = "*"
 pytest-cov = "*"
+vermin = "*"
 
 [requires]
 python_version = "3.6"
+
+[scripts]
+## https://pipenv.pypa.io/en/stable/scripts.html
+cis-audit = "python3 ./cis_audit.py"
+test-centos7 = "docker -it --rm"

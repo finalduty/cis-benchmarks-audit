@@ -1,0 +1,12 @@
+__pycache__
+.coverage
+.pytest_cache
+.tmp-*
+.tox
+.venv
+*.egg-info
+build
+checklist.txt
+coverage
+dist
+htmlcov
